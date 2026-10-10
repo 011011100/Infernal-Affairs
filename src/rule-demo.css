@@ -1219,3 +1219,236 @@
     visibility: visible;
   }
 }
+
+/* The teaching table follows day mode; faction card faces retain their colors. */
+:root[data-theme="light"] .rule-demo {
+  --rd-cyan: #176579;
+  --rd-muted: #5e6c80;
+  background: #fff;
+  border-color: #c7d2e1;
+  color: #202b3d;
+}
+:root[data-theme="light"]
+  .rule-demo
+  :is(
+    .rd-heading > div > span,
+    .rd-step-count i,
+    .rd-choice-row > span,
+    .rd-scene-kicker,
+    .rd-scene-foot,
+    .rd-aim-bridge > small,
+    .rd-turn-indicator,
+    .rd-perspective-label,
+    .rd-observer,
+    .rd-private-result,
+    .rd-gun-caption,
+    .rd-shot-bridge > small,
+    .rd-shot-health,
+    .rd-exchange-actor,
+    .rd-exchange-actor > small,
+    .rd-playback-hint,
+    .rd-explanation p
+  ) {
+  color: var(--rd-muted);
+}
+:root[data-theme="light"]
+  .rule-demo
+  :is(
+    .rd-heading h3,
+    .rd-step-count,
+    .rd-observer > b,
+    .rd-large-gun,
+    .rd-shot-outcome,
+    .rd-exchange-actor > b,
+    .rd-exchange-name > span,
+    .rd-explanation h4
+  ) {
+  color: #202b3d;
+}
+:root[data-theme="light"] .rule-demo .rd-choice-row button {
+  background: #f3f5f8;
+  border-color: #b5c3d4;
+  color: #51627b;
+}
+:root[data-theme="light"] .rule-demo .rd-choice-row button.is-selected {
+  background: #e1f0f3;
+  border-color: #77a1ae;
+  color: #205b6d;
+}
+:root[data-theme="light"] .rd-scene {
+  background: #f3f5f8;
+  border-color: #d4dce7;
+}
+:root[data-theme="light"] .rd-card-back {
+  background: #e7edf5;
+  border-color: #a4b2c6;
+  color: #51627b;
+}
+:root[data-theme="light"] .rd-card-back::after {
+  border-color: #a4b2c666;
+}
+:root[data-theme="light"] .rd-card.is-selected > .rd-card-flipper {
+  outline-color: #21758a;
+}
+:root[data-theme="light"] .rd-card-focus-dot {
+  background: #21758a;
+}
+:root[data-theme="light"] .rd-result-chip {
+  background: #e6effb;
+  border-color: #9cb7da;
+  color: #204c83;
+}
+:root[data-theme="light"] .rd-result-chip.rd-result-solo {
+  background: #e9ecf2;
+  border-color: #a9b3c5;
+  color: #3b475f;
+}
+:root[data-theme="light"] .rd-player,
+:root[data-theme="light"] .rd-exchange-row {
+  background: #fff;
+  border-color: #c2cedd;
+}
+:root[data-theme="light"] .rd-player.is-active {
+  border-color: #557ea0;
+}
+:root[data-theme="light"]
+  .rule-demo
+  :is(
+    .rd-player-heading > small,
+    .rd-target-tag,
+    .rd-aim-bridge,
+    .rd-observer.is-looking > svg,
+    .rd-investigation-link,
+    .rd-shot-bridge.is-declared,
+    .rd-exchange-path,
+    .rd-explanation-number
+  ) {
+  color: var(--rd-cyan);
+}
+:root[data-theme="light"] .rd-gun-tag {
+  color: #465d77;
+}
+:root[data-theme="light"] .rd-aim-line {
+  border-color: #397d91;
+}
+:root[data-theme="light"] .rd-turn-indicator > span.is-active {
+  background: #e1f0f3;
+  border-color: #8eafbf;
+  color: #205b6d;
+}
+:root[data-theme="light"] .rd-main-actions > span {
+  background: #fff;
+  border-color: #c7d2e1;
+  color: #5e6c80;
+}
+:root[data-theme="light"] .rd-main-actions > span.is-chosen {
+  background: #dceef1;
+  border-color: #77a1ae;
+  color: #205b6d;
+}
+:root[data-theme="light"] .rd-public-event {
+  background: #e6f1f4;
+  border-color: #aac8d3;
+  color: #315d70;
+}
+:root[data-theme="light"] .rd-public-event b {
+  color: #1f546a;
+}
+:root[data-theme="light"] .rd-shot-bridge {
+  color: #526781;
+}
+:root[data-theme="light"] .rd-shot-bridge > svg {
+  background: #f3f5f8;
+}
+:root[data-theme="light"] .rd-shot-ray {
+  border-color: #879bb0;
+}
+:root[data-theme="light"] .rd-shot-bridge.is-declared .rd-shot-ray {
+  border-color: #397d91;
+}
+:root[data-theme="light"] .rd-player.is-wounded {
+  border-color: #ac731e;
+}
+:root[data-theme="light"]
+  .rule-demo
+  :is(
+    .rd-shot-health.is-wounded,
+    .rd-shot-outcome.is-wounded,
+    .rd-exchange-outcome
+  ) {
+  color: #895500;
+}
+:root[data-theme="light"] .rd-shot-health.is-out {
+  color: #455269;
+}
+:root[data-theme="light"] .rd-response-window {
+  background: #e6f1f4;
+  border-color: #94b5c1;
+  color: #176579;
+}
+:root[data-theme="light"] .rd-response-window > span {
+  color: #315d70;
+}
+:root[data-theme="light"] .rd-response-window small {
+  color: #536b7c;
+}
+:root[data-theme="light"] .rd-team-honest {
+  color: #285b99;
+}
+:root[data-theme="light"] .rd-team-crooked {
+  color: #9c354c;
+}
+:root[data-theme="light"] .rule-demo .rd-playback-buttons button {
+  background: #f3f5f8;
+  border-color: #afc0d3;
+  color: #435b77;
+}
+:root[data-theme="light"]
+  .rule-demo
+  .rd-playback-buttons
+  button.rd-play-button {
+  background: #285f73;
+  border-color: #285f73;
+  color: #fff;
+}
+:root[data-theme="light"] .rule-demo .rd-step-selector button {
+  color: #5e6c80;
+}
+:root[data-theme="light"] .rule-demo .rd-step-selector button.is-current {
+  background: #e1f0f3;
+  border-color: #77a1ae;
+  color: #205b6d;
+}
+:root[data-theme="light"] .rule-demo button:focus-visible {
+  outline-color: #397d91;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="light"]
+    .rule-demo
+    .rd-playback-buttons
+    button:not(:disabled):hover {
+    background: #e6edf5;
+    border-color: #7d9bb9;
+  }
+  :root[data-theme="light"]
+    .rule-demo
+    .rd-playback-buttons
+    button.rd-play-button:not(:disabled):hover {
+    background: #1d4d60;
+    border-color: #1d4d60;
+  }
+  :root[data-theme="light"] .rule-demo .rd-step-selector button:hover {
+    background: #e6edf5;
+    color: #244a66;
+  }
+  :root[data-theme="light"]
+    .rule-demo
+    .rd-step-selector
+    button.is-current:hover {
+    background: #d3e9ed;
+    color: #205b6d;
+  }
+  :root[data-theme="light"] .rule-demo .rd-choice-row button:hover {
+    border-color: #578498;
+  }
+}

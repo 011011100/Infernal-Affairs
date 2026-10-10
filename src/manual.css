@@ -542,3 +542,170 @@
     opacity: 1;
   }
 }
+
+/* Day mode keeps the chapter hierarchy while matching the main table palette. */
+:root[data-theme="light"] .modal.manual-modal {
+  background: #fff;
+  border-color: #d4dce7;
+  color: #202b3d;
+  box-shadow: 0 30px 100px #263b5926;
+}
+:root[data-theme="light"] .manual-modal > .modal-heading {
+  background: #f8fafc;
+  border-color: #d4dce7;
+}
+:root[data-theme="light"] .manual-sidebar {
+  background: #f6f8fb;
+  border-color: #d4dce7;
+}
+:root[data-theme="light"] .manual-reader {
+  scrollbar-color: #a4b2c6 transparent;
+}
+:root[data-theme="light"]
+  .manual-modal
+  :is(
+    .manual-nav-caption,
+    .manual-chapter-number,
+    .manual-sidebar-note,
+    .manual-factions,
+    .manual-chapter-meta .eyebrow,
+    .manual-chapter-meta > span:last-child,
+    .manual-chapter-heading > p,
+    .manual-detail-number,
+    .manual-explanations p,
+    .manual-section-heading .eyebrow,
+    .manual-count,
+    .manual-equipment > p,
+    .manual-disclosure-body p,
+    .manual-empty,
+    .manual-edition
+  ) {
+  color: #5e6c80;
+}
+:root[data-theme="light"]
+  .manual-modal
+  :is(
+    .modal-heading h2,
+    .manual-chapter-heading h3,
+    .manual-section-heading h3,
+    .manual-explanations h4,
+    .manual-equipment-heading h4,
+    .manual-disclosure-body b
+  ) {
+  color: #202b3d;
+}
+:root[data-theme="light"] .manual-chapters button {
+  color: #51627b;
+}
+:root[data-theme="light"] .manual-chapters button.is-active {
+  background: #e5edf8;
+  border-color: #a6bddb;
+  color: #234f82;
+}
+:root[data-theme="light"]
+  .manual-chapters
+  button.is-active
+  .manual-chapter-number {
+  color: #315f92;
+}
+:root[data-theme="light"] .manual-factions i {
+  background: #3868a3;
+}
+:root[data-theme="light"] .manual-factions span + span i {
+  background: #984859;
+}
+:root[data-theme="light"] .manual-takeaway {
+  background: #edf4f8;
+  border-color: #c5d7e3;
+}
+:root[data-theme="light"] .manual-takeaway > svg,
+:root[data-theme="light"] .manual-takeaway span {
+  color: #3e687f;
+}
+:root[data-theme="light"] .manual-takeaway p {
+  color: #2e465d;
+}
+:root[data-theme="light"] .manual-lookup-shortcut {
+  background: #edf3fa;
+  border-color: #a6bcd5;
+  color: #305e8c;
+}
+:root[data-theme="light"] .manual-pitfalls {
+  background: #faf7ef;
+  border-color: #ab8744;
+}
+:root[data-theme="light"] .manual-pitfalls h4 {
+  color: #785922;
+}
+:root[data-theme="light"] .manual-pitfalls li {
+  color: #6b6251;
+}
+:root[data-theme="light"] .manual-search {
+  background: #f6f8fb;
+  border-color: #b9c5d6;
+  color: #5e6c80;
+}
+:root[data-theme="light"] .manual-search:focus-within {
+  border-color: #397d91;
+  outline-color: #397d91;
+}
+:root[data-theme="light"] .manual-search input {
+  color: #202b3d;
+}
+:root[data-theme="light"] .manual-search input::placeholder {
+  color: #5e6c80;
+}
+:root[data-theme="light"] .manual-equipment {
+  background: #f8fafc;
+  border-color: #d4dce7;
+}
+:root[data-theme="light"] .manual-equipment-heading {
+  color: #42648a;
+}
+:root[data-theme="light"] .manual-timing {
+  color: #526781;
+  border-color: #c5cfdd;
+  background: #edf2f8;
+}
+:root[data-theme="light"] .manual-disclosure,
+:root[data-theme="light"] .manual-footer {
+  border-color: #d4dce7;
+}
+:root[data-theme="light"] .manual-disclosure h4 button {
+  color: #3e5672;
+}
+:root[data-theme="light"] .manual-footer .button.outline {
+  color: #3e5672;
+  background: #fff;
+  border-color: #acbdd2;
+}
+:root[data-theme="light"] .manual-footer .button.primary {
+  background: #263f60;
+  border-color: #263f60;
+  color: #fff;
+}
+:root[data-theme="light"] .manual-modal button:focus-visible {
+  outline-color: #397d91;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="light"] .manual-chapters button:not(.is-active):hover {
+    background: #e9eef5;
+    color: #202b3d;
+  }
+  :root[data-theme="light"] .manual-disclosure h4 button:hover {
+    color: #1a537f;
+  }
+  :root[data-theme="light"] .manual-lookup-shortcut:hover,
+  :root[data-theme="light"]
+    .manual-footer
+    .button.outline:not(:disabled):hover {
+    background: #e5edf7;
+    border-color: #7f9fbd;
+  }
+  :root[data-theme="light"]
+    .manual-footer
+    .button.primary:not(:disabled):hover {
+    background: #34577e;
+    border-color: #34577e;
+  }
+}

@@ -1,0 +1,553 @@
+/* Theme controls stay in the same place in the lobby, table, and dialogs. */
+.home-header-actions,
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: none;
+}
+.modal-header-actions {
+  gap: 8px;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 76px;
+  min-height: 36px;
+  padding: 7px 10px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--paper);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.theme-toggle svg {
+  flex: none;
+}
+.theme-toggle:focus-visible {
+  outline-color: var(--accent);
+}
+@media (hover: hover) {
+  .theme-toggle:hover {
+    border-color: var(--muted);
+    color: var(--accent);
+  }
+}
+@media (max-width: 640px) {
+  .home-header-actions {
+    gap: 12px;
+  }
+  .home-header-actions .text-button > svg:last-child {
+    display: none;
+  }
+  .theme-toggle {
+    min-width: 36px;
+    padding: 7px;
+  }
+  .theme-toggle > span {
+    display: none;
+  }
+  .modal-header-actions {
+    gap: 3px;
+  }
+  .modal-heading {
+    gap: 10px;
+  }
+  .table-header {
+    gap: 9px;
+  }
+  .table-header .brand {
+    gap: 6px;
+  }
+  .table-header .header-actions {
+    align-items: center;
+  }
+}
+
+/* Light surfaces use dark text; faction card faces keep their blue/red ink. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  color: #202b3d;
+  background: #f3f5f8;
+  --bg: #f3f5f8;
+  --panel: #ffffff;
+  --line: #d4dce7;
+  --muted: #5e6c80;
+  --paper: #202b3d;
+  --ink: #202b3d;
+  --accent: #285a9a;
+  --wound: #885300;
+}
+:root[data-theme="light"] :is(button, input, select, [tabindex]):focus-visible {
+  outline-color: #285a9a;
+}
+:root[data-theme="light"] .ambient-background {
+  opacity: 0.55;
+}
+:root[data-theme="light"] .button.primary {
+  background: #253d60;
+  border-color: #253d60;
+  color: #ffffff;
+}
+:root[data-theme="light"] .button.primary:not(:disabled):hover {
+  background: #193152;
+  border-color: #193152;
+}
+:root[data-theme="light"] .button.outline {
+  border-color: #abb9cb;
+}
+:root[data-theme="light"] .button.outline:not(:disabled):hover {
+  background: #e8eef6;
+}
+:root[data-theme="light"] :is(.text-button:hover, .home-header .text-button) {
+  color: #324a6b;
+}
+:root[data-theme="light"]
+  :is(
+    .eyebrow,
+    .brand div > span,
+    .hero-description,
+    .hero-facts,
+    .case-caption,
+    .entry-top > .eyebrow,
+    .file-tag,
+    .entry-subtitle,
+    .field-label > span,
+    .entry-tabs button,
+    .avatar-button > svg,
+    .entry-note,
+    .entry-bottom,
+    .home-footer,
+    .home-footer button,
+    .room-code-label,
+    .room-code-button > svg,
+    .lobby-heading p,
+    .panel-heading h2 > span,
+    .subtle-label,
+    .seat-index,
+    .lobby-seat h3 small,
+    .ready-label,
+    .kick-player,
+    .empty h3,
+    .invite-seat,
+    .lobby-panel-footer,
+    .invite-card .eyebrow,
+    .invite-card p,
+    .readiness > span,
+    .readiness small,
+    .ready-card > p,
+    .start-hint,
+    .lobby-tip,
+    .lobby-tip p > span,
+    .game-section-heading .eyebrow,
+    .turn-counter > span,
+    .seat-number,
+    .player-name-row b > small,
+    .player-state,
+    .seat-bottomline,
+    .private-label,
+    .equipment-heading,
+    .equipment-heading small,
+    .empty-equipment,
+    .empty-equipment small,
+    .equipment-icon,
+    .equipment-card small,
+    .equipment-card > svg,
+    .action-label,
+    .action-panel > p,
+    .action-buttons small,
+    .action-buttons > button > svg:last-child,
+    .live-tag,
+    .game-log p,
+    .game-log time,
+    .emoji-note,
+    .modal-heading .eyebrow,
+    .modal-description,
+    .modal .field-label,
+    .shot-confirm p,
+    .equipment-description > svg,
+    .equipment-description > p,
+    .equipment-use-note,
+    .result-reason,
+    .result-roster b > small,
+    .result-roster > div > svg,
+    .result-close,
+    .loading-screen p,
+    .loading-screen > .text-button
+  ) {
+  color: var(--muted);
+}
+:root[data-theme="light"] :is(.brand-mark > svg, .brand-mark > span) {
+  color: #354b69;
+}
+:root[data-theme="light"] .hero h1 > span {
+  color: #536b8b;
+}
+:root[data-theme="light"]
+  :is(
+    .room-code-button,
+    .lobby-heading h1 > span,
+    .large-room-code,
+    .turn-counter > b,
+    .gun-supply b,
+    .equipment-card b,
+    .action-buttons b,
+    .equipment-choices h3,
+    .equipment-choices > button > span,
+    .loading-screen > svg,
+    .offline-wait p
+  ) {
+  color: #263e60;
+}
+:root[data-theme="light"]
+  :is(
+    .home-header,
+    .home-footer,
+    .table-header,
+    .panel-heading,
+    .lobby-panel-footer,
+    .dossier-heading,
+    .equipment-hand,
+    .equipment-choices > button > span,
+    .result-roster
+  ) {
+  border-color: var(--line);
+}
+:root[data-theme="light"]
+  :is(.hero-facts > i, .home-footer > .footer-line, .log-dot) {
+  background: #b7c3d4;
+}
+:root[data-theme="light"] .status-dot {
+  background: #3e638f;
+  box-shadow: 0 0 0 4px #3e638f12;
+}
+:root[data-theme="light"] .status-dot.dim {
+  background: #a0adbf;
+}
+:root[data-theme="light"] .preview-card {
+  box-shadow: 0 13px 25px #253d6026;
+}
+:root[data-theme="light"] .preview-card-center {
+  background: #e7edf5;
+  color: #51627b;
+  border-color: #a4b2c6;
+}
+:root[data-theme="light"] .case-stamp {
+  color: #a84961;
+  border-color: #b96b7b;
+}
+:root[data-theme="light"] .entry-panel {
+  background: #ffffffed;
+  border-color: #d4dce7;
+  box-shadow: 0 16px 60px #253d6012;
+}
+:root[data-theme="light"] .entry-panel::before {
+  background: #526e92;
+}
+:root[data-theme="light"] .entry-tabs {
+  border-color: var(--line);
+}
+:root[data-theme="light"] .entry-tabs button.active {
+  color: #253d60;
+}
+:root[data-theme="light"] .entry-tabs button.active::after {
+  background: #253d60;
+}
+:root[data-theme="light"] :is(.identity-input, .room-code-input) {
+  background: #f8fafc;
+  color: #202b3d;
+  border-color: #b8c4d4;
+}
+:root[data-theme="light"] .identity-input input {
+  color: #202b3d;
+}
+:root[data-theme="light"]
+  :is(.identity-input input, .room-code-input)::placeholder {
+  color: #66768c;
+}
+:root[data-theme="light"] .identity-input:focus-within {
+  border-color: #285a9a;
+}
+:root[data-theme="light"]
+  :is(.avatar-picker > button.selected, .avatar-picker > button:hover) {
+  background: #e8eef6;
+  border-color: #8b9fba;
+}
+:root[data-theme="light"] .capacity-selector > button {
+  color: #51627b;
+  border-color: #b8c4d4;
+}
+:root[data-theme="light"] .capacity-selector > button.selected {
+  color: #244f87;
+  background: #e2ebf8;
+  border-color: #6385b2;
+}
+:root[data-theme="light"] :is(.connection-state, .ready-label.ready) {
+  color: #285a75;
+}
+:root[data-theme="light"] .connection-state:not(.connected) {
+  color: #885300;
+}
+:root[data-theme="light"] .connection-banner {
+  background: #fff0cf;
+  color: #885300;
+}
+:root[data-theme="light"]
+  :is(
+    .lobby-seats-panel,
+    .invite-card,
+    .ready-card,
+    .my-dossier,
+    .action-panel,
+    .log-panel
+  ) {
+  background: #fffffff2;
+  border-color: var(--line);
+  color: var(--ink);
+}
+:root[data-theme="light"] .lobby-seat {
+  background: #f7f9fc;
+  border-color: #c8d3e1;
+}
+:root[data-theme="light"] .lobby-seat.empty {
+  background: #f8fafc;
+  border-color: #d4dce7;
+}
+:root[data-theme="light"] .lobby-seat.is-me {
+  background: #eaf0f9;
+  border-color: #7d99be;
+}
+:root[data-theme="light"] .presence-dot {
+  border-color: #fff;
+  background: #94a2b5;
+}
+:root[data-theme="light"] :is(.presence-dot.online, .player-online) {
+  background: #32688c;
+}
+:root[data-theme="light"] .player-online.disconnected {
+  background: #94a2b5;
+}
+:root[data-theme="light"] .host-tag {
+  color: #3e587a;
+  border-color: #a6b8ce;
+}
+:root[data-theme="light"] .empty-seat-icon {
+  color: #708199;
+  border-color: #b8c4d4;
+}
+:root[data-theme="light"] .progress-track {
+  background: #e0e7f0;
+}
+:root[data-theme="light"] .progress-track > div {
+  background: #577baa;
+}
+:root[data-theme="light"] .game-table {
+  background: #e9eef6d9;
+  border-color: #c2cfdf;
+  box-shadow: inset 0 0 70px #7890af0d;
+}
+:root[data-theme="light"] :is(.table-lines, .table-lines::after) {
+  border-color: #b4c3d766;
+}
+:root[data-theme="light"]
+  :is(.table-emblem, .table-center-title, .table-center-en) {
+  color: #6b7f9d;
+}
+:root[data-theme="light"] .gun-supply {
+  color: #536880;
+  border-color: #b9c7d9;
+}
+:root[data-theme="light"] .player-seat {
+  color: #202b3d;
+  background: #fff;
+  border-color: #b3c2d7;
+  box-shadow: 0 4px 12px #253d6012;
+}
+:root[data-theme="light"] .my-seat {
+  background: #edf3fd;
+}
+:root[data-theme="light"] .current-seat {
+  border-color: #3d638e;
+  box-shadow:
+    0 0 0 2px #3d638e26,
+    0 4px 12px #253d6012;
+}
+:root[data-theme="light"] .turn-badge {
+  color: #284b79;
+}
+:root[data-theme="light"] .under-fire {
+  border-color: #b84160;
+  box-shadow: 0 0 0 2px #b8416026;
+}
+:root[data-theme="light"] .identity-card.hidden-card {
+  background: #e7edf5;
+  color: #51627b;
+  border-color: #a4b2c6;
+}
+:root[data-theme="light"] .identity-card.hidden-card::after {
+  border-color: #a4b2c688;
+}
+:root[data-theme="light"]
+  :is(.identity-card.selected, .identity-card.inspected-card.selected) {
+  outline-color: #285a9a;
+}
+:root[data-theme="light"] .aim-label {
+  color: #813a51;
+}
+:root[data-theme="light"]
+  :is(.shot-countdown, .reaction-note, .inline-error, .shot-confirm) {
+  color: #aa3451;
+}
+:root[data-theme="light"] .team-badge {
+  background: #e6effc;
+  color: #245c9a;
+  border-color: #91b0d9;
+}
+:root[data-theme="light"] .team-badge.crooked {
+  background: #fbe8ee;
+  color: #a33250;
+  border-color: #d99bab;
+}
+:root[data-theme="light"] .team-badge.solo {
+  background: #ececf6;
+  color: #585176;
+  border-color: #b5afcc;
+}
+:root[data-theme="light"] .empty-equipment {
+  border-color: #c5d0df;
+}
+:root[data-theme="light"]
+  :is(
+    .equipment-card,
+    .action-buttons > button,
+    .emoji-toggle,
+    .target-players > button,
+    .equipment-description,
+    .equipment-choices > button,
+    .offline-wait
+  ) {
+  background: #f1f5fa;
+  color: #3e5778;
+  border-color: #c3d0e1;
+}
+:root[data-theme="light"] .your-turn {
+  border-top-color: #3d638e;
+}
+:root[data-theme="light"] .reaction-panel {
+  border-color: #bd6a81;
+}
+:root[data-theme="light"] .action-buttons > button:hover:not(:disabled) {
+  background: #e4edf9;
+  border-color: #6c8ab3;
+}
+:root[data-theme="light"] .action-buttons > button.shoot-action {
+  background: #fbe8ee;
+  color: #a33250;
+  border-color: #d99bab;
+}
+:root[data-theme="light"] .action-buttons > button.shoot-action :is(b, small) {
+  color: #a33250;
+}
+:root[data-theme="light"] :is(.game-logs, .modal) {
+  scrollbar-color: #a2b3cb transparent;
+}
+:root[data-theme="light"] .emoji-tray {
+  background: #fff;
+  border-color: #b8c9de;
+  box-shadow: 0 8px 22px #253d6022;
+}
+:root[data-theme="light"] .emoji-tray > button:hover {
+  background: #e8eef6;
+}
+:root[data-theme="light"] .modal-backdrop {
+  background: #34476659;
+}
+:root[data-theme="light"] .modal {
+  background: #fff;
+  color: #202b3d;
+  border-color: #c3cfdf;
+  box-shadow: 0 28px 90px #253d602e;
+}
+:root[data-theme="light"] .target-players > button.selected {
+  background: #dfeafb;
+  border-color: #6286b8;
+  color: #244e85;
+}
+:root[data-theme="light"] .victory-emblem {
+  color: #2865a6;
+}
+:root[data-theme="light"] .victory-emblem.crooked {
+  color: #ac3d5a;
+}
+:root[data-theme="light"] .victory-emblem.solo {
+  color: #645583;
+}
+:root[data-theme="light"] .toast {
+  background: #fff;
+  color: #202b3d;
+  border-color: #a5b8d1;
+  box-shadow: 0 10px 30px #253d6026;
+}
+:root[data-theme="light"] .toast > button {
+  color: #516580;
+}
+:root[data-theme="light"] .player-seat.wounded-seat {
+  box-shadow:
+    inset 3px 0 0 #b87913,
+    0 4px 12px #253d6012;
+}
+:root[data-theme="light"] :is(.wound-status, .injury-notice) {
+  background: #fff2d6;
+  border-color: #dab267;
+}
+:root[data-theme="light"] :is(.wound-status small, .injury-notice small) {
+  color: #805818;
+}
+:root[data-theme="light"] .investigation-notice {
+  background: #edf6f8;
+  border-color: #afd0d8;
+  color: #3c6470;
+}
+:root[data-theme="light"] .investigation-notice.is-recent {
+  background: #e1f1f5;
+  border-color: #659eac;
+}
+:root[data-theme="light"]
+  :is(
+    .investigation-notice-heading,
+    .investigation-events strong,
+    .log-inspection-icon
+  ) {
+  color: #226475;
+}
+:root[data-theme="light"]
+  :is(
+    .investigation-notice-heading > small,
+    .investigation-events > p,
+    .game-log.investigation-log p,
+    .game-log.investigation-log time
+  ) {
+  color: #416571;
+}
+:root[data-theme="light"] .investigation-events b {
+  color: #224b57;
+}
+:root[data-theme="light"] .investigation-events strong {
+  background: #cde7ed;
+}
+:root[data-theme="light"] .player-seat.inspected-seat::after {
+  border-color: #2e879b;
+}
+:root[data-theme="light"] .identity-card.inspected-card {
+  outline-color: #22768c;
+}
+:root[data-theme="light"] .card-inspection-marker {
+  background: #d7eff3;
+  color: #1e6375;
+  border-color: #4e8f9f;
+}

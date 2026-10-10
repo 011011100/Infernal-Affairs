@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import type { EquipmentCard, GameLog } from "../shared/types";
 import RulesManual from "./RulesManual";
+import { ThemeToggle } from "./Theme";
 import type { RoomView } from "../shared/room";
 import { AVATARS, EMOJIS } from "../shared/room";
 import {
@@ -243,9 +244,12 @@ function Modal({
             {eyebrow && <span className="eyebrow">{eyebrow}</span>}
             <h2>{title}</h2>
           </div>
-          <IconButton label="关闭弹窗" onClick={onClose}>
-            <X size={20} />
-          </IconButton>
+          <div className="modal-header-actions">
+            <ThemeToggle />
+            <IconButton label="关闭弹窗" onClick={onClose}>
+              <X size={20} />
+            </IconButton>
+          </div>
         </div>
         {children}
       </div>
@@ -301,9 +305,12 @@ function Home({
     <div className="home">
       <header className="home-header">
         <Brand />
-        <button className="text-button" onClick={onRules}>
-          <BookOpen size={17} /> 行动手册 <ArrowRight size={16} />
-        </button>
+        <div className="home-header-actions">
+          <ThemeToggle />
+          <button className="text-button" onClick={onRules}>
+            <BookOpen size={17} /> 行动手册 <ArrowRight size={16} />
+          </button>
+        </div>
       </header>
       <main className="home-main">
         <section className="hero">
@@ -591,6 +598,7 @@ function TableHeader({
         </span>
       </div>
       <div className="header-actions">
+        <ThemeToggle />
         <IconButton label="行动手册" onClick={onRules}>
           <BookOpen size={19} />
         </IconButton>
@@ -2357,6 +2365,7 @@ export default function App() {
       ) : loading || !room ? (
         <div className="loading-screen">
           <Brand />
+          <ThemeToggle />
           <LoaderCircle className="spin" size={29} />
           <h2>{loading ? "正在回到你的牌桌" : "正在恢复房间连接"}</h2>
           <p>请稍等，正在与服务器同步最新状态。</p>
