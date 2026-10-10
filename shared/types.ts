@@ -110,6 +110,8 @@ export interface CardView {
   value: CardValue | null;
   revealed: boolean;
   known: boolean;
+  /** Hidden cards never disclose the location of a wounded leader. */
+  wounded: boolean;
 }
 export interface PlayerView extends PlayerIdentity {
   alive: boolean;

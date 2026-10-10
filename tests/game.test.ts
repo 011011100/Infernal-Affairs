@@ -8,6 +8,8 @@ import {
   teamOf,
 } from "../server/game.js";
 import { createEquipmentDeck } from "../shared/equipment.js";
+import { RoomService } from "../server/rooms.js";
+import { RoomStore } from "../server/store.js";
 import type { EquipmentKind, GamePlayer, GameState } from "../shared/types.js";
 
 function fresh(count = 4): GameState {
@@ -758,4 +760,292 @@ test("finished games reject mutations, dead players cannot act, and players cann
     () => applyGameAction(game, actor, { type: "arm", revealIndex: 0 }),
     /已经结束/,
   );
+});
+
+test("each leader's wound is visible to every player immediately after the shot and remains through equipment selection", () => {
+  for (const leaderValue of ["agent", "kingpin"] as const) {
+    let game = fresh();
+    const victim = game.players.find((target) =>
+      target.cards.some((card) => card.value === leaderValue),
+    )!;
+    const shooter = other(game, victim.id);
+    game.currentPlayerId = shooter.id;
+    shooter.armed = true;
+    shooter.aimingAt = victim.id;
+    game.gunSupply -= 1;
+    game = applyGameAction(game, shooter.id, { type: "shoot" });
+
+    for (const viewer of game.players) {
+      const before = gameView(game, viewer.id).players.find(
+        (target) => target.id === victim.id,
+      )!;
+      assert.equal(
+        before.wounded,
+        false,
+        "declaring a shot must not wound early",
+      );
+      assert.ok(before.cards.every((card) => !card.wounded));
+    }
+
+    game = applyGameAction(game, "", { type: "resolveShot" });
+    assert.equal(game.phase, "equipment");
+    for (const viewer of game.players) {
+      const after = gameView(game, viewer.id).players.find(
+        (target) => target.id === victim.id,
+      )!;
+      assert.equal(after.alive, true);
+      assert.equal(after.wounded, true);
+      assert.ok(after.cards.every((card) => card.revealed));
+      assert.deepEqual(
+        after.cards.filter((card) => card.wounded).map((card) => card.value),
+        [leaderValue],
+        "the wound belongs only to the leader card, not every identity",
+      );
+    }
+
+    game = applyGameAction(game, victim.id, {
+      type: "chooseEquipment",
+      cardId: game.equipmentChoices!.cards[0]!.id,
+    });
+    game = JSON.parse(JSON.stringify(game)) as GameState;
+    for (const viewer of game.players) {
+      const persisted = gameView(game, viewer.id).players.find(
+        (target) => target.id === victim.id,
+      )!;
+      assert.equal(persisted.wounded, true);
+      assert.equal(
+        persisted.cards.find((card) => card.wounded)?.value,
+        leaderValue,
+      );
+    }
+
+    game = shootAt(
+      game,
+      game.players.find((target) => target.id === shooter.id)!,
+      game.players.find((target) => target.id === victim.id)!,
+    );
+    assert.equal(game.status, "finished");
+    assert.equal(
+      game.winner!.team,
+      leaderValue === "agent" ? "crooked" : "honest",
+    );
+    for (const viewer of game.players) {
+      const defeated = gameView(game, viewer.id).players.find(
+        (target) => target.id === victim.id,
+      )!;
+      assert.equal(
+        defeated.alive,
+        false,
+        "defeat must take precedence over a historic wound in the UI",
+      );
+      assert.equal(defeated.wounded, true);
+      assert.equal(
+        defeated.cards.find((card) => card.wounded)?.value,
+        leaderValue,
+      );
+    }
+  }
+});
+
+test("flashbang preserves public player injury without disclosing the hidden leader's card position", () => {
+  let game = fresh();
+  const victim = game.players.find((target) =>
+    target.cards.some((card) => card.value === "agent"),
+  )!;
+  const shooter = other(game, victim.id);
+  game = shootAt(game, shooter, victim);
+  game = applyGameAction(game, victim.id, {
+    type: "chooseEquipment",
+    cardId: game.equipmentChoices!.cards[0]!.id,
+  });
+  const flashbang = give(game, shooter.id, "flashbang");
+  game = applyGameAction(game, shooter.id, {
+    type: "useEquipment",
+    cardId: flashbang,
+    targetId: victim.id,
+  });
+  const leaderIndex = game.players
+    .find((target) => target.id === victim.id)!
+    .cards.findIndex((card) => card.value === "agent");
+
+  for (const viewer of game.players) {
+    const view = gameView(game, viewer.id).players.find(
+      (target) => target.id === victim.id,
+    )!;
+    assert.equal(view.wounded, true);
+    assert.ok(view.cards.every((card) => !card.revealed));
+    if (viewer.id === victim.id) {
+      assert.equal(view.cards[leaderIndex]!.wounded, true);
+    } else {
+      assert.ok(
+        view.cards.every((card) => card.value === null && !card.wounded),
+      );
+    }
+  }
+
+  game.currentPlayerId = shooter.id;
+  game.phase = "action";
+  game = applyGameAction(game, shooter.id, {
+    type: "investigate",
+    targetId: victim.id,
+    cardIndex: leaderIndex,
+  });
+  assert.equal(
+    gameView(game, shooter.id).players.find(
+      (target) => target.id === victim.id,
+    )!.cards[leaderIndex]!.wounded,
+    true,
+  );
+  const bystander = game.players.find(
+    (target) => target.id !== shooter.id && target.id !== victim.id,
+  )!;
+  assert.ok(
+    gameView(game, bystander.id)
+      .players.find((target) => target.id === victim.id)!
+      .cards.every((card) => card.value === null && !card.wounded),
+  );
+});
+
+test("a real bullet wound and its visible marker follow blackmail to a new owner, who dies on the next bullet", () => {
+  let game = fresh();
+  const victim = game.players.find((target) =>
+    target.cards.some((card) => card.value === "agent"),
+  )!;
+  const recipient = game.players.find((target) =>
+    target.cards.every(
+      (card) => card.value !== "agent" && card.value !== "kingpin",
+    ),
+  )!;
+  const actor = game.players.find(
+    (target) => target.id !== victim.id && target.id !== recipient.id,
+  )!;
+  game = shootAt(game, actor, victim);
+  game = applyGameAction(game, victim.id, {
+    type: "chooseEquipment",
+    cardId: game.equipmentChoices!.cards[0]!.id,
+  });
+  const leaderIndex = game.players
+    .find((target) => target.id === victim.id)!
+    .cards.findIndex((card) => card.value === "agent");
+  const blackmail = give(game, actor.id, "blackmail");
+  game = applyGameAction(game, actor.id, {
+    type: "useEquipment",
+    cardId: blackmail,
+    targetId: victim.id,
+    cardIndex: leaderIndex,
+    otherTargetId: recipient.id,
+    otherCardIndex: 1,
+  });
+  for (const viewer of game.players) {
+    const view = gameView(game, viewer.id);
+    const former = view.players.find((target) => target.id === victim.id)!;
+    const next = view.players.find((target) => target.id === recipient.id)!;
+    assert.equal(former.wounded, false);
+    assert.ok(former.cards.every((card) => !card.wounded));
+    assert.equal(next.wounded, true);
+    assert.equal(next.cards[1]!.value, "agent");
+    assert.equal(next.cards[1]!.wounded, true);
+    assert.equal(next.cards[1]!.revealed, true);
+  }
+  game = shootAt(
+    game,
+    game.players.find((target) => target.id === actor.id)!,
+    game.players.find((target) => target.id === recipient.id)!,
+  );
+  assert.equal(game.status, "finished");
+  assert.equal(
+    game.players.find((target) => target.id === recipient.id)!.alive,
+    false,
+  );
+  assert.equal(game.winner!.team, "crooked");
+});
+
+test("defibrillator cannot heal a living wounded leader or consume the item on rejection", () => {
+  let game = fresh();
+  const victim = game.players.find((target) =>
+    target.cards.some((card) => card.value === "agent"),
+  )!;
+  const actor = other(game, victim.id);
+  game = shootAt(game, actor, victim);
+  game = applyGameAction(game, victim.id, {
+    type: "chooseEquipment",
+    cardId: game.equipmentChoices!.cards[0]!.id,
+  });
+  const cardId = give(game, actor.id, "defibrillator");
+  const before = JSON.stringify(game);
+  assert.throws(
+    () =>
+      applyGameAction(game, actor.id, {
+        type: "useEquipment",
+        cardId,
+        targetId: victim.id,
+      }),
+    /已出局/,
+  );
+  assert.equal(JSON.stringify(game), before);
+  assert.equal(
+    gameView(game, actor.id).players.find((target) => target.id === victim.id)!
+      .wounded,
+    true,
+  );
+});
+
+test("a persisted pending shot restores and publishes the wound on both room and game player projections", () => {
+  const store = new RoomStore(":memory:");
+  try {
+    const service = new RoomService(store);
+    const host = service.create({ name: "房主", capacity: 4 });
+    for (let index = 1; index < 4; index += 1)
+      service.join(host.room.code, { name: `队员${index}` });
+    const room = service.get(host.room.code);
+    let game = createGame(
+      room.members.map(({ id, name, avatar }) => ({ id, name, avatar })),
+    );
+    const victim = game.players.find((target) =>
+      target.cards.some((card) => card.value === "agent"),
+    )!;
+    const shooter = other(game, victim.id);
+    game.currentPlayerId = shooter.id;
+    shooter.armed = true;
+    shooter.aimingAt = victim.id;
+    game.gunSupply -= 1;
+    game = applyGameAction(game, shooter.id, { type: "shoot" });
+    game.pendingShot!.deadline = Date.now() - 1;
+    room.game = game;
+    store.save(room.code, room);
+
+    const restored = new RoomService(store);
+    restored.tick();
+    const settled = restored.get(room.code);
+    assert.equal(settled.game!.phase, "equipment");
+    assert.equal(settled.game!.pendingShot, undefined);
+    for (const viewer of settled.members) {
+      const view = restored.view(settled, viewer.id);
+      const top = view.players.find((target) => target.id === victim.id)!;
+      const nested = view.game!.players.find(
+        (target) => target.id === victim.id,
+      )!;
+      assert.equal(top.alive, true);
+      assert.equal(top.wounded, true);
+      assert.deepEqual(top.cards, nested.cards);
+      assert.equal(top.cards.find((card) => card.wounded)?.value, "agent");
+    }
+
+    const restartedAgain = new RoomService(store);
+    const persisted = restartedAgain.get(room.code);
+    assert.equal(
+      persisted
+        .game!.players.find((target) => target.id === victim.id)!
+        .cards.find((card) => card.value === "agent")!.wounded,
+      true,
+    );
+    assert.equal(
+      restartedAgain
+        .view(persisted, host.playerId)
+        .players.find((target) => target.id === victim.id)!.wounded,
+      true,
+    );
+  } finally {
+    store.close();
+  }
 });

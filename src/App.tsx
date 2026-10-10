@@ -63,13 +63,13 @@ const IDENTITY: Record<
   agent: {
     name: "探长",
     en: "THE AGENT",
-    className: "honest",
+    className: "honest leader agent",
     description: "忠诚警察的首领",
   },
   kingpin: {
     name: "主谋",
     en: "THE KINGPIN",
-    className: "crooked",
+    className: "crooked leader kingpin",
     description: "变节警察的首领",
   },
 };
@@ -78,6 +78,24 @@ const TEAM_NAMES: Record<string, string> = {
   crooked: "变节警察",
   solo: "独行者",
 };
+function AmbientBackground() {
+  const [paused, setPaused] = useState(() => document.hidden);
+  useEffect(() => {
+    const syncVisibility = () => setPaused(document.hidden);
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
+  return (
+    <div
+      className={`ambient-background ${paused ? "ambient-paused" : ""}`}
+      aria-hidden="true"
+    >
+      <span className="ambient-light ambient-blue" />
+      <span className="ambient-light ambient-red" />
+    </div>
+  );
+}
 function initialSession(): Session | null {
   try {
     return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
@@ -841,12 +859,18 @@ function IdentityCard({
   return (
     <button
       type="button"
-      className={`identity-card ${small ? "small-card" : ""} ${identity?.className || "hidden-card"} ${selected ? "selected" : ""} ${card.revealed ? "public-card" : ""} ${selectable ? "selectable" : ""}`}
+      className={`identity-card ${small ? "small-card" : ""} ${identity?.className || "hidden-card"} ${selected ? "selected" : ""} ${card.revealed ? "public-card" : ""} ${selectable ? "selectable" : ""} ${card.wounded ? "wounded-card" : ""}`}
       disabled={!selectable}
       onClick={onClick}
-      aria-label={`第 ${index + 1} 张身份牌：${identity?.name || "未知"}，${card.revealed ? "已公开" : own ? "仅你可见" : card.known ? "已调查" : "未调查"}`}
+      aria-label={`第 ${index + 1} 张身份牌：${identity?.name || "未知"}，${card.revealed ? "已公开" : own ? "仅你可见" : card.known ? "已调查" : "未调查"}${card.wounded ? "，已受伤" : ""}`}
     >
       <span className="card-order">0{index + 1}</span>
+      {card.wounded && (
+        <span className="card-wound" aria-hidden="true">
+          <HeartCrack size={small ? 11 : 12} />
+          {!small && "受伤"}
+        </span>
+      )}
       {identity ? (
         <>
           {card.value === "agent" || card.value === "kingpin" ? (
@@ -909,7 +933,7 @@ function PlayerSeat({
 }) {
   return (
     <div
-      className={`player-seat ${player.id === currentId ? "current-seat" : ""} ${player.id === myId ? "my-seat" : ""} ${!player.alive ? "eliminated-seat" : ""} ${selectable ? "targetable-seat" : ""} ${selected ? "selected-seat" : ""} ${shotTarget === player.id ? "under-fire" : ""}`}
+      className={`player-seat ${player.id === currentId ? "current-seat" : ""} ${player.id === myId ? "my-seat" : ""} ${!player.alive ? "eliminated-seat" : ""} ${player.alive && player.wounded ? "wounded-seat" : ""} ${selectable ? "targetable-seat" : ""} ${selected ? "selected-seat" : ""} ${shotTarget === player.id ? "under-fire" : ""}`}
       onClick={selectable ? onClick : undefined}
       role={selectable ? "button" : undefined}
       tabIndex={selectable ? 0 : undefined}
@@ -946,14 +970,12 @@ function PlayerSeat({
               <>
                 <Skull size={11} /> 已出局
               </>
-            ) : player.wounded ? (
-              <>
-                <HeartCrack size={11} /> 已受伤
-              </>
             ) : player.armed ? (
               <>
                 <Crosshair size={11} /> 持有枪械
               </>
+            ) : player.cards.every((card) => card.revealed) ? (
+              "身份已公开"
             ) : (
               "身份待查"
             )}
@@ -965,6 +987,15 @@ function PlayerSeat({
           <IdentityCard key={i} card={card} index={i} small />
         ))}
       </div>
+      {player.alive && player.wounded && (
+        <div className="wound-status" role="status">
+          <HeartCrack size={13} />
+          <span>
+            <b>已受伤</b>
+            <small>再中弹即出局</small>
+          </span>
+        </div>
+      )}
       <div className="seat-bottomline">
         <span>
           <Clipboard size={11} /> {player.equipmentCount}
@@ -1326,6 +1357,15 @@ function Game({
               <LockKeyhole size={11} /> 仅你可见
             </span>
           </div>
+          {me.alive && me.wounded && (
+            <div className="injury-notice" role="status">
+              <HeartCrack size={21} />
+              <span>
+                <b>你已受伤</b>
+                <small>再次中弹将被击败，请留意防御装备。</small>
+              </span>
+            </div>
+          )}
           <div className="dossier-content">
             <div className="my-identities">
               {me.cards.map((card, i) => (
@@ -2230,6 +2270,7 @@ export default function App() {
   }
   return (
     <>
+      <AmbientBackground />
       {!session ? (
         <Home
           onEnter={enter}

@@ -834,6 +834,7 @@ export function gameView(game: GameState, viewerId: string): GameView {
           value: known ? card.value : null,
           revealed: card.revealed,
           known,
+          wounded: known && card.wounded,
         };
       }),
     })),

@@ -1,4 +1,4 @@
-import type { GameView } from "./types.js";
+import type { CardView, GameView } from "./types.js";
 
 export const EMOJIS = ["👍", "👎", "🤔", "😱", "😂", "😎", "🤫", "🎯"] as const;
 export const AVATARS = [
@@ -22,11 +22,7 @@ export interface MemberView {
   wounded: boolean;
   armed: boolean;
   aimingAt: string | null;
-  cards: Array<{
-    value: "honest" | "crooked" | "agent" | "kingpin" | null;
-    revealed: boolean;
-    known: boolean;
-  }>;
+  cards: CardView[];
   equipmentCount: number;
 }
 export interface RoomView {

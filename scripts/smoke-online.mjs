@@ -90,11 +90,29 @@ try {
   await action(sessions[1], { type: "emoji", emoji: "👍" });
   assert.equal((await getView(sessions[0])).emojis.at(-1).emoji, "👍");
   let room = await getView(sessions[0]);
+  let leaderInjuryVisible = false;
   for (let step = 0; room.status === "playing" && step < 70; step++) {
     const game = room.game;
     if (game.phase === "reaction") {
       await pause(Math.max(100, game.pendingShot.deadline - Date.now() + 700));
       room = await getView(sessions[0]);
+      if (
+        room.status === "playing" &&
+        room.players.find((p) => p.id === leaderId)?.wounded
+      ) {
+        for (const session of sessions) {
+          const injured = (await getView(session)).players.find(
+            (p) => p.id === leaderId,
+          );
+          assert.equal(injured.alive, true);
+          assert.equal(injured.wounded, true);
+          assert.deepEqual(
+            injured.cards.filter((c) => c.wounded).map((c) => c.value),
+            ["kingpin"],
+          );
+        }
+        leaderInjuryVisible = true;
+      }
       continue;
     }
     if (game.phase === "equipment") {
@@ -137,6 +155,11 @@ try {
     }
   }
   assert.equal(room.status, "finished");
+  assert.equal(
+    leaderInjuryVisible,
+    true,
+    "all players must receive the first-shot injury marker",
+  );
   assert.equal(room.game.winner.team, "honest");
   assert.equal(
     room.players.every((p) => p.cards.every((c) => c.value !== null)),
@@ -148,6 +171,7 @@ try {
     authenticatedWebSockets: true,
     identityPrivacy: true,
     emojiDelivery: true,
+    leaderInjuryVisible,
     completeGame: true,
     winner: room.game.winner.team,
   };
