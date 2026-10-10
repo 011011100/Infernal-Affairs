@@ -36,6 +36,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { EquipmentCard, GameLog } from "../shared/types";
+import RulesManual from "./RulesManual";
 import type { RoomView } from "../shared/room";
 import { AVATARS, EMOJIS } from "../shared/room";
 import {
@@ -254,88 +255,12 @@ function Modal({
 function Rules({ onClose }: { onClose: () => void }) {
   return (
     <Modal
-      title="上桌之前，了解游戏"
-      eyebrow="FIELD MANUAL / 行动手册"
+      title="行动手册"
+      eyebrow="FIELD MANUAL / 从第一张牌开始"
       onClose={onClose}
-      className="rules-modal"
+      className="rules-modal manual-modal"
     >
-      <p className="muted">4—8 人 · 隐藏身份 · 轮流行动 · 无需语音</p>
-      <div className="rule-goal">
-        <Flag size={23} />
-        <div>
-          <b>找到队友，击败对方首领。</b>
-          <p>忠诚警察保护探长、击败主谋；变节警察保护主谋、击败探长。</p>
-        </div>
-      </div>
-      <div className="rule-section">
-        <span className="section-number">01</span>
-        <div>
-          <h3>三张身份牌，一重秘密</h3>
-          <p>
-            每人持有三张身份牌。普通玩家按多数牌决定阵营；持有探长或主谋牌时以首领身份为准。调查时，所有人都能看见谁查看了谁的第几张牌，但牌面内容只对查看者可见。
-          </p>
-        </div>
-      </div>
-      <div className="rule-section">
-        <span className="section-number">02</span>
-        <div>
-          <h3>轮到你时，选择一个行动</h3>
-          <div className="rule-actions">
-            <p>
-              <Eye size={17} />
-              <span>
-                <b>调查</b>查看另一人的一张隐藏身份牌。
-              </span>
-            </p>
-            <p>
-              <Crosshair size={17} />
-              <span>
-                <b>拿枪</b>公开自己一张身份牌，取得一把枪。
-              </span>
-            </p>
-            <p>
-              <Clipboard size={17} />
-              <span>
-                <b>拿装备</b>公开自己一张身份牌，抽取战术装备。
-              </span>
-            </p>
-            <p>
-              <Zap size={17} />
-              <span>
-                <b>开枪</b>射击当前瞄准的人，留出装备反应时间。
-              </span>
-            </p>
-          </div>
-        </div>
-      </div>
-      <div className="rule-section">
-        <span className="section-number">03</span>
-        <div>
-          <h3>瞄准，然后把回合交出去</h3>
-          <p>
-            主行动结束后，持枪者选择瞄准对象。刚拿到枪的回合不能立刻射击。普通玩家中枪出局，首领第一次中枪受伤，第二次中枪出局。
-          </p>
-        </div>
-      </div>
-      <div className="rule-section">
-        <span className="section-number">04</span>
-        <div>
-          <h3>装备会改变局势</h3>
-          <p>
-            装备通常可以在任何人的回合使用，手牌上限一张，超出时先择留；部分装备需要在射击反应窗口使用。身份交换后，阵营可能改变。具体效果以装备说明为准。
-          </p>
-        </div>
-      </div>
-      <div className="rule-footnote">
-        <Info size={18} />
-        <p>
-          表情对全桌可见，每 2
-          秒可发一次。断线后使用同一浏览器回来可自动重连。房间状态以服务器为准。
-        </p>
-      </div>
-      <button className="button primary full-width" onClick={onClose}>
-        明白了，准备入局 <ArrowRight size={17} />
-      </button>
+      <RulesManual onClose={onClose} />
     </Modal>
   );
 }
@@ -377,7 +302,7 @@ function Home({
       <header className="home-header">
         <Brand />
         <button className="text-button" onClick={onRules}>
-          <BookOpen size={17} /> 游戏规则 <ArrowRight size={16} />
+          <BookOpen size={17} /> 行动手册 <ArrowRight size={16} />
         </button>
       </header>
       <main className="home-main">
@@ -666,7 +591,7 @@ function TableHeader({
         </span>
       </div>
       <div className="header-actions">
-        <IconButton label="游戏规则" onClick={onRules}>
+        <IconButton label="行动手册" onClick={onRules}>
           <BookOpen size={19} />
         </IconButton>
         <IconButton label="离开房间" onClick={onLeave}>
