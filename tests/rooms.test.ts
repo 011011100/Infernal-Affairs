@@ -9,6 +9,8 @@ import test, { type TestContext } from "node:test";
 import WebSocket from "ws";
 import { createApp } from "../server/app.js";
 import { EMOJIS, type RoomView } from "../shared/room.js";
+import { createEquipmentDeck } from "../shared/equipment.js";
+import type { GameLog } from "../shared/types.js";
 
 type Server = Awaited<ReturnType<typeof createApp>>;
 interface Session {
@@ -180,6 +182,75 @@ async function fixture(t: TestContext, dbPath = ":memory:") {
     close,
     startGame,
   };
+}
+
+async function assertPublicInvestigation(
+  f: Awaited<ReturnType<typeof fixture>>,
+  sessions: Session[],
+  expectedEvent: NonNullable<GameLog["investigations"]>,
+  authorizedInvestigations = expectedEvent,
+) {
+  const raw = f.service.get(sessions[0].room.code).game!;
+  const storedEvent = raw.logs.findLast((entry) => entry.investigations)!;
+  assert.ok(storedEvent, "successful investigation must have a public event");
+  for (const session of sessions) {
+    const http = await f.view(session);
+    const peer = f.peers[sessions.indexOf(session)];
+    await eventually(
+      () =>
+        peer.messages.some(
+          (message) => message.room?.revision === http.revision,
+        ),
+      "investigation event websocket broadcast",
+    );
+    const websocket = peer.messages.findLast(
+      (message) => message.room?.revision === http.revision,
+    )!.room!;
+    for (const room of [http, websocket]) {
+      const event = room.game!.logs.find(
+        (entry) => entry.id === storedEvent.id,
+      )!;
+      assert.deepEqual(
+        event.investigations,
+        expectedEvent,
+        "all viewers receive the same IDs and slots",
+      );
+      assert.deepEqual(Object.keys(event).sort(), [
+        "at",
+        "id",
+        "investigations",
+        "text",
+      ]);
+      for (const target of room.players) {
+        const rawTarget = raw.players.find(
+          (player) => player.id === target.id,
+        )!;
+        target.cards.forEach((card, index) => {
+          const mayKnow =
+            target.id === session.playerId ||
+            card.revealed ||
+            authorizedInvestigations.some(
+              (investigation) =>
+                investigation.investigatorId === session.playerId &&
+                investigation.targetId === target.id &&
+                investigation.cardIndices.includes(index),
+            );
+          assert.equal(
+            card.value,
+            mayKnow ? rawTarget.cards[index]!.value : null,
+            "public investigation events must not grant bystanders card knowledge",
+          );
+          assert.equal(card.known, mayKnow);
+          assert.equal(
+            card.revealed,
+            false,
+            "investigation never reveals the card to the table",
+          );
+          assert.equal(card.wounded, false);
+        });
+      }
+    }
+  }
 }
 
 function assertPrivateProjection(
@@ -435,31 +506,155 @@ test("HTTP and websocket game projections disclose only the viewer’s own hand"
     false,
     "a private investigation must not publicly reveal the card",
   );
-  for (const bystander of sessions.filter(
-    (session) => session !== investigator && session !== target,
-  )) {
-    const room = await f.view(bystander);
-    assert.equal(
-      room.players.find((player) => player.id === target.playerId)!.cards[1]
-        .value,
-      null,
-    );
-    const peer = f.peers[sessions.indexOf(bystander)];
-    await eventually(
-      () =>
-        peer.messages.some(
-          (message) => message.room?.revision === room.revision,
-        ),
-      "private investigation broadcast",
-    );
-    const broadcast = peer.messages.findLast(
-      (message) => message.room?.revision === room.revision,
-    )!.room!;
-    assert.equal(
-      broadcast.players.find((player) => player.id === target.playerId)!
-        .cards[1].value,
-      null,
-    );
+  await assertPublicInvestigation(f, sessions, [
+    {
+      investigatorId: investigator.playerId,
+      targetId: target.playerId,
+      cardIndices: [1],
+    },
+  ]);
+  const beforeInvalid = await f.view(sessions[0]);
+  const next = sessions.find(
+    (session) => session.playerId === beforeInvalid.game!.currentPlayerId,
+  )!;
+  const invalid = await f.request(next, {
+    type: "investigate",
+    targetId: sessions.find((session) => session !== next)!.playerId,
+    cardIndex: 99,
+  });
+  assert.equal(invalid.statusCode, 400);
+  const afterInvalid = await f.view(sessions[0]);
+  assert.equal(afterInvalid.revision, beforeInvalid.revision);
+  assert.deepEqual(afterInvalid.game!.logs, beforeInvalid.game!.logs);
+});
+
+test("equipment investigations publish exact slots over HTTP and websocket without disclosing identities", async (t) => {
+  for (const kind of ["wiretap", "polygraph", "metalDetector"] as const) {
+    await t.test(kind, async (t) => {
+      const f = await fixture(t);
+      const sessions = await f.startGame();
+      const [actor, first, second] = sessions;
+      const raw = f.service.get(actor.room.code).game!;
+      const equipment = createEquipmentDeck().find(
+        (card) => card.kind === kind,
+      )!;
+      raw.equipmentDeck = raw.equipmentDeck.filter(
+        (card) => card.kind !== kind,
+      );
+      for (const player of raw.players)
+        player.equipment = player.equipment.filter(
+          (card) => card.kind !== kind,
+        );
+      const actorState = raw.players.find(
+        (player) => player.id === actor.playerId,
+      )!;
+      raw.equipmentDeck.push(...actorState.equipment);
+      actorState.equipment = [equipment];
+
+      if (kind === "wiretap") {
+        const room = await f.action(actor, {
+          type: "useEquipment",
+          cardId: equipment.id,
+          targetId: first.playerId,
+          cardIndex: 0,
+          otherTargetId: second.playerId,
+          otherCardIndex: 2,
+        });
+        const event = room.game!.logs.findLast(
+          (entry) => entry.investigations,
+        )!;
+        assert.ok(
+          event.text.includes("第 1 张") && event.text.includes("第 3 张"),
+        );
+        await assertPublicInvestigation(f, sessions, [
+          {
+            investigatorId: actor.playerId,
+            targetId: first.playerId,
+            cardIndices: [0],
+          },
+          {
+            investigatorId: actor.playerId,
+            targetId: second.playerId,
+            cardIndices: [2],
+          },
+        ]);
+      } else if (kind === "polygraph") {
+        await f.action(actor, {
+          type: "useEquipment",
+          cardId: equipment.id,
+          targetId: first.playerId,
+        });
+        await assertPublicInvestigation(f, sessions, [
+          {
+            investigatorId: actor.playerId,
+            targetId: first.playerId,
+            cardIndices: [0, 1, 2],
+          },
+          {
+            investigatorId: first.playerId,
+            targetId: actor.playerId,
+            cardIndices: [0, 1, 2],
+          },
+        ]);
+      } else {
+        for (const session of [first, second]) {
+          raw.players.find((player) => player.id === session.playerId)!.armed =
+            true;
+          raw.gunSupply -= 1;
+        }
+        const pending = await f.action(actor, {
+          type: "useEquipment",
+          cardId: equipment.id,
+        });
+        assert.equal(
+          pending.game!.logs.some((entry) => entry.investigations),
+          false,
+          "a pending choice is not a completed investigation",
+        );
+        const firstEvent = [
+          {
+            investigatorId: actor.playerId,
+            targetId: first.playerId,
+            cardIndices: [2],
+          },
+        ];
+        const firstResult = await f.action(actor, {
+          type: "chooseInvestigation",
+          targetId: first.playerId,
+          cardIndex: 2,
+        });
+        assert.ok(
+          firstResult
+            .game!.logs.findLast((entry) => entry.investigations)!
+            .text.includes("第 3 张"),
+        );
+        await assertPublicInvestigation(f, sessions, firstEvent);
+        const secondEvent = [
+          {
+            investigatorId: actor.playerId,
+            targetId: second.playerId,
+            cardIndices: [0],
+          },
+        ];
+        await f.action(actor, {
+          type: "chooseInvestigation",
+          targetId: second.playerId,
+          cardIndex: 0,
+        });
+        await assertPublicInvestigation(f, sessions, secondEvent, [
+          ...firstEvent,
+          ...secondEvent,
+        ]);
+        const events = (await f.view(actor)).game!.logs.filter(
+          (entry) => entry.investigations,
+        );
+        assert.equal(
+          events.length,
+          2,
+          "each detector choice creates its own investigation event",
+        );
+      }
+    });
   }
 });
 

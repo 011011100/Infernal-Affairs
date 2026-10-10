@@ -133,6 +133,18 @@ test("investigation teaches only its actor and advances an unarmed turn", () => 
     game.players.find((item) => item.id === target.id)!.cards[0]!.revealed,
     false,
   );
+  for (const viewer of game.players) {
+    const event = gameView(game, viewer.id).logs.findLast(
+      (entry) => entry.investigations,
+    );
+    assert.deepEqual(event?.investigations, [
+      {
+        investigatorId: actor.id,
+        targetId: target.id,
+        cardIndices: [0],
+      },
+    ]);
+  }
 });
 
 test("invalid and out-of-turn actions leave original state byte-for-byte intact", () => {
@@ -1048,4 +1060,81 @@ test("a persisted pending shot restores and publishes the wound on both room and
   } finally {
     store.close();
   }
+});
+
+test("investigation history survives snapshots, supports old logs, and is copied without private metadata", () => {
+  let game = fresh();
+  const actor = current(game).id;
+  const target = other(game).id;
+  game = applyGameAction(game, actor, {
+    type: "investigate",
+    targetId: target,
+    cardIndex: 2,
+  });
+  game = JSON.parse(JSON.stringify(game)) as GameState;
+  const storedEvent = game.logs.findLast((entry) => entry.investigations)!;
+  Object.assign(storedEvent, { privateNote: "not public" });
+  Object.assign(storedEvent.investigations![0]!, {
+    value: "kingpin",
+    cardId: "private-card",
+  });
+  const firstView = gameView(game, target);
+  assert.equal(
+    firstView.logs[0]!.investigations,
+    undefined,
+    "pre-existing logs remain readable",
+  );
+  const event = firstView.logs.find((entry) => entry.id === storedEvent.id)!;
+  assert.deepEqual(event, {
+    id: storedEvent.id,
+    text: storedEvent.text,
+    at: storedEvent.at,
+    investigations: [
+      { investigatorId: actor, targetId: target, cardIndices: [2] },
+    ],
+  });
+  event.investigations![0]!.cardIndices.push(0);
+  event.investigations![0]!.targetId = "changed-in-client";
+  event.investigations!.push({
+    investigatorId: actor,
+    targetId: target,
+    cardIndices: [1],
+  });
+  const nextView = gameView(game, actor);
+  assert.deepEqual(
+    nextView.logs.find((entry) => entry.id === storedEvent.id)!.investigations,
+    [{ investigatorId: actor, targetId: target, cardIndices: [2] }],
+  );
+  assert.deepEqual(storedEvent.investigations![0]!.cardIndices, [2]);
+});
+
+test("a rejected second wiretap target adds neither a public event nor partial private knowledge", () => {
+  const game = fresh();
+  const actor = current(game).id;
+  const [first, second] = game.players.filter((target) => target.id !== actor);
+  const cardId = give(game, actor, "wiretap");
+  second!.cards[1]!.revealed = true;
+  const before = JSON.stringify(game);
+  assert.throws(
+    () =>
+      applyGameAction(game, actor, {
+        type: "useEquipment",
+        cardId,
+        targetId: first!.id,
+        cardIndex: 0,
+        otherTargetId: second!.id,
+        otherCardIndex: 1,
+      }),
+    /已经公开/,
+  );
+  assert.equal(JSON.stringify(game), before);
+  assert.equal(
+    game.logs.some((entry) => entry.investigations),
+    false,
+  );
+  assert.equal(
+    gameView(game, actor).players.find((target) => target.id === first!.id)!
+      .cards[0]!.known,
+    false,
+  );
 });

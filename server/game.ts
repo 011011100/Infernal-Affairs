@@ -3,6 +3,7 @@ import type {
   CardValue,
   EquipmentCard,
   GameAction,
+  GameLog,
   GameOptions,
   GamePhase,
   GamePlayer,
@@ -62,9 +63,18 @@ function hiddenIdentity(
   return result;
 }
 
-function log(game: GameState, text: string): void {
+function log(
+  game: GameState,
+  text: string,
+  investigations?: GameLog["investigations"],
+): void {
   game.logSequence += 1;
-  game.logs.push({ id: `log-${game.logSequence}`, text, at: Date.now() });
+  game.logs.push({
+    id: `log-${game.logSequence}`,
+    text,
+    at: Date.now(),
+    ...(investigations ? { investigations } : {}),
+  });
   if (game.logs.length > 100) game.logs.splice(0, game.logs.length - 100);
 }
 
@@ -349,7 +359,14 @@ function chooseInvestigation(
   pending.targetIds = pending.targetIds.filter((id) => id !== targetId);
   log(
     game,
-    `${player(game, actorId).name} 用金属探测器调查了 ${target.name} 的一张身份`,
+    `${player(game, actorId).name} 用金属探测器调查了 ${target.name} 的第 ${cardIndex + 1} 张身份`,
+    [
+      {
+        investigatorId: actorId,
+        targetId: target.id,
+        cardIndices: [cardIndex],
+      },
+    ],
   );
   if (pending.targetIds.length === 0) {
     delete game.pendingInvestigations;
@@ -517,7 +534,22 @@ function useEquipment(
       requireRule(target.id !== actor.id, "请选择另一名玩家");
       for (const card of target.cards) game.known[actor.id]![card.id] = true;
       for (const card of actor.cards) game.known[target.id]![card.id] = true;
-      log(game, `${actor.name} 与 ${target.name} 互相查看了身份`);
+      log(
+        game,
+        `${actor.name} 与 ${target.name} 互相查看了全部身份（第 1、2、3 张）`,
+        [
+          {
+            investigatorId: actor.id,
+            targetId: target.id,
+            cardIndices: [0, 1, 2],
+          },
+          {
+            investigatorId: target.id,
+            targetId: actor.id,
+            cardIndices: [0, 1, 2],
+          },
+        ],
+      );
       break;
     }
     case "reportAudit":
@@ -587,7 +619,22 @@ function useEquipment(
       );
       investigate(game, actor.id, first, action.cardIndex!);
       investigate(game, actor.id, second, action.otherCardIndex!);
-      log(game, `${actor.name} 窃听了 ${first.name} 与 ${second.name} 的身份`);
+      log(
+        game,
+        `${actor.name} 窃听了 ${first.name} 的第 ${action.cardIndex! + 1} 张身份和 ${second.name} 的第 ${action.otherCardIndex! + 1} 张身份`,
+        [
+          {
+            investigatorId: actor.id,
+            targetId: first.id,
+            cardIndices: [action.cardIndex!],
+          },
+          {
+            investigatorId: actor.id,
+            targetId: second.id,
+            cardIndices: [action.otherCardIndex!],
+          },
+        ],
+      );
       break;
     }
   }
@@ -750,6 +797,13 @@ export function applyGameAction(
       log(
         game,
         `${actor.name} 调查了 ${target.name} 的第 ${action.cardIndex + 1} 张身份`,
+        [
+          {
+            investigatorId: actorId,
+            targetId: target.id,
+            cardIndices: [action.cardIndex],
+          },
+        ],
       );
       game.lastInvestigation = {
         targetId: target.id,
@@ -809,7 +863,22 @@ export function gameView(game: GameState, viewerId: string): GameView {
     winner: game.winner ? { ...game.winner } : null,
     gunSupply: game.gunSupply,
     direction: game.direction,
-    logs: game.logs.map((entry) => ({ ...entry })),
+    logs: game.logs.map((entry) => ({
+      id: entry.id,
+      text: entry.text,
+      at: entry.at,
+      ...(entry.investigations
+        ? {
+            investigations: entry.investigations.map(
+              ({ investigatorId, targetId, cardIndices }) => ({
+                investigatorId,
+                targetId,
+                cardIndices: [...cardIndices],
+              }),
+            ),
+          }
+        : {}),
+    })),
     ...(game.pendingShot ? { pendingShot: { ...game.pendingShot } } : {}),
     ...(game.pendingReveals
       ? { pendingRevealPlayerId: game.pendingReveals.playerIds[0] }

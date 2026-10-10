@@ -35,9 +35,14 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import type { EquipmentCard } from "../shared/types";
+import type { EquipmentCard, GameLog } from "../shared/types";
 import type { RoomView } from "../shared/room";
 import { AVATARS, EMOJIS } from "../shared/room";
+import {
+  investigationBaseline,
+  isInvestigationCueActive,
+  receiveInvestigationSnapshot,
+} from "./investigationCue";
 
 type Session = { code: string; token: string; playerId: string };
 type Player = RoomView["players"][number];
@@ -110,6 +115,23 @@ function inviteCode() {
 }
 function nameOf(players: Player[], id?: string | null) {
   return players.find((p) => p.id === id)?.name || "未知玩家";
+}
+function cardPositions(indices: number[]) {
+  return `第 ${indices.map((index) => index + 1).join("、")} 张身份牌`;
+}
+function investigationLabel(
+  investigations: NonNullable<GameLog["investigations"]>,
+  players: Player[],
+  targetId: string,
+  cardIndex: number,
+) {
+  const observers = investigations.filter(
+    (event) =>
+      event.targetId === targetId && event.cardIndices.includes(cardIndex),
+  );
+  return observers.length
+    ? `${observers.map((event) => nameOf(players, event.investigatorId)).join("、")} 刚刚查看了这张牌`
+    : undefined;
 }
 function IconButton({
   label,
@@ -250,7 +272,7 @@ function Rules({ onClose }: { onClose: () => void }) {
         <div>
           <h3>三张身份牌，一重秘密</h3>
           <p>
-            每人持有三张身份牌。普通玩家按多数牌决定阵营；持有探长或主谋牌时以首领身份为准。只有自己能看到完整身份，调查到的牌也只对调查者可见。
+            每人持有三张身份牌。普通玩家按多数牌决定阵营；持有探长或主谋牌时以首领身份为准。调查时，所有人都能看见谁查看了谁的第几张牌，但牌面内容只对查看者可见。
           </p>
         </div>
       </div>
@@ -846,6 +868,7 @@ function IdentityCard({
   selected = false,
   onClick,
   small = false,
+  inspectionLabel,
 }: {
   card: Player["cards"][number];
   index: number;
@@ -854,17 +877,24 @@ function IdentityCard({
   selected?: boolean;
   onClick?: () => void;
   small?: boolean;
+  inspectionLabel?: string;
 }) {
   const identity = card.value ? IDENTITY[card.value] : null;
   return (
     <button
       type="button"
-      className={`identity-card ${small ? "small-card" : ""} ${identity?.className || "hidden-card"} ${selected ? "selected" : ""} ${card.revealed ? "public-card" : ""} ${selectable ? "selectable" : ""} ${card.wounded ? "wounded-card" : ""}`}
+      className={`identity-card ${small ? "small-card" : ""} ${identity?.className || "hidden-card"} ${selected ? "selected" : ""} ${card.revealed ? "public-card" : ""} ${selectable ? "selectable" : ""} ${card.wounded ? "wounded-card" : ""} ${inspectionLabel ? "inspected-card" : ""}`}
       disabled={!selectable}
       onClick={onClick}
-      aria-label={`第 ${index + 1} 张身份牌：${identity?.name || "未知"}，${card.revealed ? "已公开" : own ? "仅你可见" : card.known ? "已调查" : "未调查"}${card.wounded ? "，已受伤" : ""}`}
+      title={inspectionLabel}
+      aria-label={`第 ${index + 1} 张身份牌：${identity?.name || "未知"}，${card.revealed ? "已公开" : own ? "仅你可见" : card.known ? "已调查" : "未调查"}${card.wounded ? "，已受伤" : ""}${inspectionLabel ? `，${inspectionLabel}` : ""}`}
     >
       <span className="card-order">0{index + 1}</span>
+      {inspectionLabel && (
+        <span className="card-inspection-marker" aria-hidden="true">
+          <Eye size={small ? 12 : 14} />
+        </span>
+      )}
       {card.wounded && (
         <span className="card-wound" aria-hidden="true">
           <HeartCrack size={small ? 11 : 12} />
@@ -918,6 +948,7 @@ function PlayerSeat({
   selectable = false,
   selected = false,
   plantedEvidence = false,
+  investigations = [],
 }: {
   player: Player;
   index: number;
@@ -930,10 +961,11 @@ function PlayerSeat({
   selectable?: boolean;
   selected?: boolean;
   plantedEvidence?: boolean;
+  investigations?: NonNullable<GameLog["investigations"]>;
 }) {
   return (
     <div
-      className={`player-seat ${player.id === currentId ? "current-seat" : ""} ${player.id === myId ? "my-seat" : ""} ${!player.alive ? "eliminated-seat" : ""} ${player.alive && player.wounded ? "wounded-seat" : ""} ${selectable ? "targetable-seat" : ""} ${selected ? "selected-seat" : ""} ${shotTarget === player.id ? "under-fire" : ""}`}
+      className={`player-seat ${player.id === currentId ? "current-seat" : ""} ${player.id === myId ? "my-seat" : ""} ${!player.alive ? "eliminated-seat" : ""} ${player.alive && player.wounded ? "wounded-seat" : ""} ${selectable ? "targetable-seat" : ""} ${selected ? "selected-seat" : ""} ${shotTarget === player.id ? "under-fire" : ""} ${investigations.some((event) => event.targetId === player.id) ? "inspected-seat" : ""}`}
       onClick={selectable ? onClick : undefined}
       role={selectable ? "button" : undefined}
       tabIndex={selectable ? 0 : undefined}
@@ -984,7 +1016,19 @@ function PlayerSeat({
       </div>
       <div className="seat-cards">
         {player.cards.map((card, i) => (
-          <IdentityCard key={i} card={card} index={i} small />
+          <IdentityCard
+            key={i}
+            card={card}
+            index={i}
+            small
+            own={player.id === myId}
+            inspectionLabel={investigationLabel(
+              investigations,
+              players,
+              player.id,
+              i,
+            )}
+          />
         ))}
       </div>
       {player.alive && player.wounded && (
@@ -1107,12 +1151,14 @@ function TargetPicker({
 
 function Game({
   room,
+  syncEpoch,
   meId,
   busy,
   onAction,
   toast,
 }: {
   room: RoomView;
+  syncEpoch: number;
   meId: string;
   busy: boolean;
   onAction: (action: Action) => void;
@@ -1150,6 +1196,46 @@ function Game({
     .map((c, i) => (!c.revealed ? i : -1))
     .filter((i) => i !== -1);
   const myEquipment = game.me.equipment || [];
+  const latestInvestigation = game.logs
+    .filter((entry) => entry.investigations?.length)
+    .at(-1);
+  const latestInvestigationId = latestInvestigation?.id;
+  const lastLogId = game.logs.at(-1)?.id;
+  const investigationSnapshot = {
+    syncEpoch,
+    id: latestInvestigationId,
+    tailId: lastLogId,
+  };
+  const [investigationState, setInvestigationState] = useState(() =>
+    investigationBaseline(investigationSnapshot),
+  );
+  const activeInvestigations = isInvestigationCueActive(
+    investigationState,
+    investigationSnapshot,
+  )
+    ? (latestInvestigation?.investigations ?? [])
+    : [];
+  useEffect(() => {
+    setInvestigationState((previous) =>
+      receiveInvestigationSnapshot(previous, {
+        syncEpoch,
+        id: latestInvestigationId,
+        tailId: lastLogId,
+      }),
+    );
+  }, [syncEpoch, latestInvestigationId, lastLogId]);
+  useEffect(() => {
+    const cue = investigationState.cue;
+    if (!cue) return;
+    const timer = window.setTimeout(
+      () =>
+        setInvestigationState((previous) =>
+          previous.cue === cue ? { ...previous, cue: null } : previous,
+        ),
+      8000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [investigationState.cue]);
   const waitingPlayer = players.find((p) => p.id === room.waitingPlayerId);
   const offlineSeconds = waitingPlayer?.disconnectedAt
     ? Math.floor((now - waitingPlayer.disconnectedAt) / 1000)
@@ -1162,7 +1248,7 @@ function Game({
   useEffect(() => {
     const container = logEnd.current?.parentElement;
     if (container) container.scrollTop = container.scrollHeight;
-  }, [game.logs.length]);
+  }, [lastLogId]);
   useEffect(() => {
     setMode(null);
     setTargetId("");
@@ -1306,6 +1392,28 @@ function Game({
             <b>{String(game.turn).padStart(2, "0")}</b>
           </div>
         </div>
+        {latestInvestigation && (
+          <section
+            className={`investigation-notice ${activeInvestigations.length ? "is-recent" : ""}`}
+            aria-label="公开调查动态"
+            aria-live="polite"
+          >
+            <div className="investigation-notice-heading">
+              <Eye size={16} />
+              <b>{activeInvestigations.length ? "刚刚调查" : "最近调查"}</b>
+              <small>牌位公开 · 内容仅查看者可见</small>
+            </div>
+            <div className="investigation-events">
+              {latestInvestigation.investigations?.map((event, index) => (
+                <p key={`${latestInvestigation.id}-${index}`}>
+                  <b>{nameOf(players, event.investigatorId)}</b> 查看了{" "}
+                  <b>{nameOf(players, event.targetId)}</b> 的{" "}
+                  <strong>{cardPositions(event.cardIndices)}</strong>
+                </p>
+              ))}
+            </div>
+          </section>
+        )}
         <div className={`game-table players-${players.length}`}>
           <div className="table-lines" aria-hidden="true" />
           <div className="table-center">
@@ -1341,6 +1449,7 @@ function Game({
                 }
                 emoji={recentEmoji(player.id)}
                 shotTarget={pending?.targetId}
+                investigations={activeInvestigations}
               />
             ))}
           </div>
@@ -1369,7 +1478,18 @@ function Game({
           <div className="dossier-content">
             <div className="my-identities">
               {me.cards.map((card, i) => (
-                <IdentityCard key={i} card={card} index={i} own />
+                <IdentityCard
+                  key={i}
+                  card={card}
+                  index={i}
+                  own
+                  inspectionLabel={investigationLabel(
+                    activeInvestigations,
+                    players,
+                    meId,
+                    i,
+                  )}
+                />
               ))}
             </div>
             <div className="equipment-hand">
@@ -1597,8 +1717,19 @@ function Game({
             aria-live="polite"
           >
             {game.logs.map((log) => (
-              <div className="game-log" key={log.id}>
-                <span className="log-dot" />
+              <div
+                className={`game-log ${log.investigations?.length ? "investigation-log" : ""}`}
+                key={log.id}
+              >
+                {log.investigations?.length ? (
+                  <Eye
+                    size={12}
+                    className="log-inspection-icon"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <span className="log-dot" />
+                )}
                 <p>{log.text}</p>
                 <time>
                   {new Date(log.at).toLocaleTimeString("zh-CN", {
@@ -1661,7 +1792,7 @@ function Game({
             <>
               <p className="modal-description">
                 {mode === "investigate"
-                  ? "只有你能看到调查结果，选一张尚未公开的牌。"
+                  ? "选一张尚未公开的牌。所有人会看到你查看的牌位，牌面内容只有你能看到。"
                   : isRedirect
                     ? "限制令要求你选择另一名目标，随后重新进入射击反应窗口。"
                     : "瞄准结果会对全桌公开，选择后结束本回合。"}
@@ -2014,7 +2145,13 @@ function Game({
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(initialSession);
-  const [room, setRoom] = useState<RoomView | null>(null);
+  const [{ room, syncEpoch }, setRoomSnapshot] = useState<{
+    room: RoomView | null;
+    syncEpoch: number;
+  }>({ room: null, syncEpoch: 0 });
+  const setRoom = useCallback((next: RoomView | null) => {
+    setRoomSnapshot((previous) => ({ ...previous, room: next }));
+  }, []);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(!!session);
   const [connection, setConnection] = useState<Connection>("connecting");
@@ -2039,14 +2176,19 @@ export default function App() {
   }, []);
   const closeRules = useCallback(() => setRules(false), []);
   const closeLeaving = useCallback(() => setLeaving(false), []);
-  const updateRoom = useCallback((next: RoomView) => {
-    setRoom((previous) =>
-      !previous ||
-      previous.code !== next.code ||
-      next.revision >= previous.revision
-        ? next
-        : previous,
-    );
+  const updateRoom = useCallback((next: RoomView, restored = false) => {
+    setRoomSnapshot((previous) => {
+      if (
+        previous.room?.code === next.code &&
+        next.revision < previous.room.revision
+      ) {
+        return previous;
+      }
+      return {
+        room: next,
+        syncEpoch: previous.syncEpoch + (restored ? 1 : 0),
+      };
+    });
   }, []);
   const saveSession = useCallback((next: Session | null) => {
     setSession(next);
@@ -2065,6 +2207,7 @@ export default function App() {
       socket = new WebSocket(
         `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
       );
+      let awaitingSnapshot = true;
       socket.onopen = () => {
         attempts = 0;
         setConnection("connected");
@@ -2081,7 +2224,8 @@ export default function App() {
         try {
           const message = JSON.parse(event.data);
           if (message.type === "room" && message.room) {
-            updateRoom(message.room);
+            updateRoom(message.room, awaitingSnapshot);
+            awaitingSnapshot = false;
             setLoading(false);
           } else if (message.type === "removed") {
             cancelled = true;
@@ -2129,7 +2273,7 @@ export default function App() {
           setLoading(false);
           return;
         }
-        updateRoom(data.room);
+        updateRoom(data.room, true);
         setLoading(false);
         connect();
       })
@@ -2199,7 +2343,7 @@ export default function App() {
         },
       );
       const data = await response.json();
-      if (data.room) updateRoom(data.room);
+      if (data.room) updateRoom(data.room, response.status === 409);
       if (response.status === 409) {
         const latest = await fetch(
           `/api/rooms/${encodeURIComponent(session.code)}`,
@@ -2207,7 +2351,7 @@ export default function App() {
         );
         if (latest.ok) {
           const fresh = await latest.json();
-          updateRoom(fresh.room);
+          updateRoom(fresh.room, true);
         }
       }
       if (!response.ok) throw new Error(data.error || "行动未完成");
@@ -2328,6 +2472,7 @@ export default function App() {
           ) : (
             <Game
               room={room}
+              syncEpoch={syncEpoch}
               meId={session.playerId}
               busy={busy || connection !== "connected"}
               onAction={action}

@@ -10,6 +10,7 @@ if (!origin)
   );
 const sessions = [];
 const sockets = [];
+const socketViews = new Map();
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function api(path, body, token) {
   const response = await fetch(new URL(path, origin), {
@@ -58,6 +59,11 @@ try {
       new URL("/ws", origin).href.replace(/^http/, "ws"),
     );
     sockets.push(socket);
+    socket.on("message", (raw) => {
+      const message = JSON.parse(String(raw));
+      if (message.type === "room")
+        socketViews.set(session.playerId, message.room);
+    });
     await once(socket, "open");
     const response = once(socket, "message");
     socket.send(JSON.stringify({ type: "subscribe", ...session }));
@@ -87,6 +93,54 @@ try {
     assert.equal(JSON.stringify(room).includes("tokenHash"), false);
   }
   assert.ok(leaderId);
+  const initial = await getView(sessions[0]);
+  const investigator = sessions.find(
+    (s) => s.playerId === initial.game.currentPlayerId,
+  );
+  const investigationTarget = sessions.find((s) => s !== investigator);
+  const investigated = await action(investigator, {
+    type: "investigate",
+    targetId: investigationTarget.playerId,
+    cardIndex: 1,
+  });
+  const expectedInvestigation = [
+    {
+      investigatorId: investigator.playerId,
+      targetId: investigationTarget.playerId,
+      cardIndices: [1],
+    },
+  ];
+  const deliveryDeadline = Date.now() + 10_000;
+  while (
+    sessions.some(
+      (s) =>
+        (socketViews.get(s.playerId)?.revision ?? 0) < investigated.revision,
+    ) &&
+    Date.now() < deliveryDeadline
+  )
+    await pause(50);
+  for (const session of sessions) {
+    for (const view of [
+      await getView(session),
+      socketViews.get(session.playerId),
+    ]) {
+      const event = view.game.logs
+        .filter((entry) => entry.investigations?.length)
+        .at(-1);
+      assert.deepEqual(event?.investigations, expectedInvestigation);
+      const card = view.players.find(
+        (p) => p.id === investigationTarget.playerId,
+      ).cards[1];
+      assert.equal(card.revealed, false);
+      const canSeeValue =
+        session === investigator || session === investigationTarget;
+      assert.equal(
+        card.value !== null,
+        canSeeValue,
+        "public card positions must not disclose the investigated value",
+      );
+    }
+  }
   await action(sessions[1], { type: "emoji", emoji: "👍" });
   assert.equal((await getView(sessions[0])).emojis.at(-1).emoji, "👍");
   let room = await getView(sessions[0]);
@@ -170,6 +224,8 @@ try {
     players: 4,
     authenticatedWebSockets: true,
     identityPrivacy: true,
+    publicInvestigationPositions: true,
+    privateInvestigationContent: true,
     emojiDelivery: true,
     leaderInjuryVisible,
     completeGame: true,

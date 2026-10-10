@@ -62,6 +62,12 @@ export interface GameLog {
   id: string;
   text: string;
   at: number;
+  /** Public action history: zero-based slots, never identity values or card IDs. */
+  investigations?: Array<{
+    investigatorId: string;
+    targetId: string;
+    cardIndices: number[];
+  }>;
 }
 export interface Winner {
   team: Team;

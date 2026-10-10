@@ -3397,3 +3397,196 @@ button:not(:disabled):active {
     will-change: auto;
   }
 }
+
+/* Investigation exposes the action and card position, never the card face. */
+.investigation-notice {
+  min-width: 0;
+  margin: 0 0 14px;
+  padding: 13px 15px;
+  border: 1px solid #76cbd82b;
+  border-radius: 6px;
+  background: #111a20;
+  color: #b8cdd2;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+.investigation-notice.is-recent {
+  border-color: #8cdae77a;
+  background: #142329;
+}
+.investigation-notice-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin-bottom: 8px;
+  color: #9adce4;
+}
+.investigation-notice-heading > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.investigation-notice-heading > b {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.investigation-notice-heading > small {
+  margin-left: auto;
+  color: #a1b5bd;
+  font-size: 10px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.investigation-events {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.investigation-events > p {
+  min-width: 0;
+  margin: 0;
+  color: #b8c9cf;
+  font-size: 12px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.investigation-events b {
+  color: #e0edf0;
+  font-weight: 600;
+}
+.investigation-events strong {
+  display: inline-block;
+  margin: 0 3px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #8cdae711;
+  color: #a5e4eb;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* The outer cyan trace leaves turn, damage and incoming-shot borders intact. */
+.player-seat::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    border-color 180ms ease;
+}
+.player-seat.inspected-seat::after {
+  border-color: #86d7e183;
+  opacity: 1;
+}
+.identity-card {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition:
+    border-color 180ms ease,
+    outline-color 180ms ease;
+}
+.identity-card.inspected-card {
+  outline-color: #91e0e7;
+}
+.identity-card.inspected-card.selected {
+  outline-color: #e9eef9;
+  outline-offset: 3px;
+}
+.card-inspection-marker {
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 18px;
+  margin-left: -13px;
+  border: 1px solid #81d2dd;
+  border-radius: 5px;
+  background: #163039;
+  color: #b9f0f4;
+  pointer-events: none;
+}
+.card-inspection-marker > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.small-card .card-inspection-marker {
+  bottom: -12px;
+  width: 22px;
+  height: 14px;
+  margin-left: -11px;
+  border-radius: 4px;
+}
+.small-card .card-inspection-marker > svg {
+  width: 12px;
+  height: 12px;
+}
+/* Reserve marker space permanently so highlighting never shifts a seat. */
+.seat-cards {
+  padding-bottom: 8px;
+}
+.my-identities,
+.target-cards {
+  padding-bottom: 14px;
+}
+.game-log.investigation-log {
+  gap: 7px;
+}
+.log-inspection-icon {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin-top: 4px;
+  color: #99dce5;
+}
+.game-log.investigation-log p {
+  min-width: 0;
+  color: #c5dce1;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.game-log.investigation-log time {
+  color: #a1b8c1;
+  font-size: 8px;
+}
+@media (max-width: 640px) {
+  .investigation-notice {
+    margin-bottom: 12px;
+    padding: 12px 13px;
+  }
+  .investigation-notice-heading {
+    gap: 6px;
+  }
+  .investigation-notice-heading > small {
+    flex-basis: 100%;
+    margin-left: 22px;
+    font-size: 10px;
+  }
+  .investigation-events > p {
+    font-size: 12px;
+    line-height: 1.9;
+  }
+  .investigation-events strong {
+    margin: 1px 2px;
+    padding: 0 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .investigation-notice,
+  .player-seat::after,
+  .identity-card {
+    transition: none;
+  }
+}
