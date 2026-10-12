@@ -1372,15 +1372,7 @@ button:not(:disabled):active {
 .players-5 .player-seat:nth-child(5) {
   grid-column: 3;
 }
-.floating-emoji {
-  position: absolute;
-  font-size: 37px;
-  right: -12px;
-  top: -18px;
-  filter: drop-shadow(0 4px 6px #00000088);
-  z-index: 5;
-  animation: emoji-in 0.35s ease-out;
-}
+
 .shot-countdown {
   color: #f2a5b3;
   display: flex;
@@ -1690,60 +1682,6 @@ button:not(:disabled):active {
   flex: none;
   color: #919297;
   margin-top: 4px;
-}
-.emoji-area {
-  position: relative;
-}
-.emoji-toggle {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid #313237;
-  background: #1a1d27;
-  border-radius: 5px;
-  padding: 12px 15px;
-  color: #c2cbde;
-  border-color: #41495d;
-}
-.emoji-toggle > span {
-  font-size: 10px;
-  flex: 1;
-  text-align: left;
-}
-.emoji-note {
-  display: block;
-  text-align: center;
-  font-size: 8px;
-  color: #919297;
-  margin-top: 8px;
-}
-.emoji-tray {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  margin-bottom: 10px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
-  background: #1d202b;
-  border: 1px solid #616267;
-  border-radius: 5px;
-  padding: 10px;
-  z-index: 5;
-  box-shadow: 0 8px 22px #00000055;
-  border-color: #5a647c;
-}
-.emoji-tray > button {
-  border: 0;
-  background: transparent;
-  border-radius: 3px;
-  padding: 6px;
-  font-size: 25px;
-}
-.emoji-tray > button:hover {
-  background: #343b4d;
 }
 .rematch-button {
   margin-top: 10px;
@@ -2102,16 +2040,7 @@ button:not(:disabled):active {
     margin-bottom: 0;
   }
 }
-@keyframes emoji-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.7);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+
 @media (min-width: 1400px) {
   .home {
     padding-top: 45px;
@@ -2335,9 +2264,6 @@ button:not(:disabled):active {
   .log-panel {
     max-height: 276px;
     min-height: 215px;
-  }
-  .emoji-area {
-    align-self: end;
   }
   .game-table {
     min-height: 405px;
@@ -2925,21 +2851,6 @@ button:not(:disabled):active {
   }
   .game-log time {
     font-size: 8px;
-  }
-  .emoji-toggle {
-    padding: 13px;
-  }
-  .emoji-toggle > span {
-    font-size: 11px;
-  }
-  .emoji-tray {
-    grid-template-columns: repeat(8, 1fr);
-    padding: 8px;
-    gap: 0;
-  }
-  .emoji-tray > button {
-    font-size: 22px;
-    padding: 6px 2px;
   }
   .modal-backdrop {
     padding: 15px;

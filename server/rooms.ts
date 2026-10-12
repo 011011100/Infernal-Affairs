@@ -13,7 +13,8 @@ import {
   getWaitingPlayerId,
 } from "./game.js";
 import type { GameState, GameAction } from "../shared/types.js";
-import { AVATARS, EMOJIS, type RoomView } from "../shared/room.js";
+import { AVATARS, type RoomView } from "../shared/room.js";
+import { isReactionId } from "../shared/reactions.js";
 import { RoomStore } from "./store.js";
 
 interface Member {
@@ -277,13 +278,13 @@ export class RoomService {
         break;
       }
       case "emoji":
-        if (!(EMOJIS as readonly unknown[]).includes(body.emoji))
-          throw new RoomError("不支持这个表情");
+        if (!isReactionId(body.emoji)) throw new RoomError("不支持这个表情");
+        if (room.game?.status === "finished")
+          throw new RoomError("对局已结束，不能发送信号");
         if (Date.now() - self.lastEmoji < 2000)
           throw new RoomError("表情发送太快啦，稍等一下", 429);
         if (
           room.game &&
-          gameView(room.game, self.id).status !== "finished" &&
           !gameView(room.game, self.id).players.find((p) => p.id === self.id)
             ?.alive
         )
@@ -294,7 +295,7 @@ export class RoomService {
           {
             id: randomUUID(),
             playerId: self.id,
-            emoji: String(body.emoji),
+            emoji: body.emoji,
             at: Date.now(),
           },
         ].slice(-48);

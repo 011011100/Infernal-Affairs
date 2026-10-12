@@ -1,0 +1,463 @@
+.reaction-area,
+.reaction-bubble {
+  --reaction-tone: #c4d6e4;
+  --reaction-wash: #202c38;
+  --reaction-rim: #5e778a;
+  --reaction-surface: #17202a;
+}
+.reaction-area {
+  position: relative;
+  min-width: 0;
+  align-self: end;
+}
+.reaction-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--paper);
+  text-align: left;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.reaction-toggle > span {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 500;
+}
+.reaction-toggle > svg {
+  flex: none;
+}
+.reaction-toggle > .reaction-glyph {
+  width: 26px;
+  height: 26px;
+  color: var(--reaction-tone);
+}
+.reaction-toggle[aria-expanded="true"] {
+  border-color: var(--reaction-rim);
+  background: var(--reaction-surface);
+}
+.reaction-picker-note {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.reaction-picker-panel {
+  position: fixed;
+  z-index: 35;
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(740px, calc(100dvh - 32px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--reaction-rim) transparent;
+  border: 1px solid var(--reaction-rim);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--paper);
+  box-shadow:
+    0 12px 40px #0007,
+    0 2px 8px #0004;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: right bottom;
+  transition:
+    opacity 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.reaction-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 14px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.reaction-panel-header h3 {
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0.3px;
+}
+.reaction-panel-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.65;
+}
+.reaction-panel-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    transform 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.reaction-groups {
+  display: grid;
+  gap: 12px;
+  padding: 14px 12px 16px;
+}
+.reaction-group {
+  min-width: 0;
+}
+.reaction-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 2px 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.6px;
+}
+.reaction-group-heading::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  opacity: 0.6;
+}
+.reaction-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.reaction-group:is([data-group="action"], [data-group="card"]) .reaction-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.reaction-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 4px 3px 5px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--reaction-tone);
+  touch-action: manipulation;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.reaction-button > span {
+  max-width: 100%;
+  color: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.reaction-button > .reaction-glyph {
+  width: 34px;
+  height: 34px;
+}
+.reaction-button:disabled {
+  opacity: 0.46;
+}
+.reaction-button[aria-pressed="true"] {
+  border-color: var(--reaction-rim);
+  background: var(--reaction-wash);
+}
+.reaction-area
+  :is(.reaction-button, .reaction-toggle, .reaction-panel-close):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.reaction-area
+  :is(.reaction-button, .reaction-toggle, .reaction-panel-close):not(
+    :disabled
+  ):active {
+  transform: scale(0.97);
+}
+.reaction-area
+  :is(
+    .reaction-button,
+    .reaction-toggle,
+    .reaction-panel-close
+  ):focus-visible:active {
+  transform: none;
+}
+.reaction-area:has(:focus-visible) .reaction-picker-panel {
+  transition: none;
+}
+.reaction-panel-status {
+  position: sticky;
+  bottom: 0;
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.65;
+}
+.reaction-glyph {
+  display: block;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  overflow: visible;
+}
+.reaction-glyph-frame {
+  fill: var(--reaction-surface, #17202a);
+  stroke: var(--reaction-rim, #5e778a);
+  stroke-width: 1;
+}
+.reaction-glyph-frame-detail {
+  stroke-width: 1;
+  opacity: 0.4;
+}
+.reaction-glyph-tint {
+  fill: currentColor;
+  fill-opacity: 0.14;
+  stroke: none;
+}
+.reaction-glyph-solid {
+  fill: currentColor;
+  stroke: none;
+}
+.reaction-glyph-cutout {
+  fill: var(--reaction-surface, #17202a);
+  stroke: none;
+}
+.reaction-glyph-detail {
+  stroke-width: 1.1;
+  opacity: 0.6;
+}
+.reaction-glyph-bold {
+  stroke-width: 2.4;
+}
+.reaction-glyph-number {
+  fill: currentColor;
+  stroke: none;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 21px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+}
+.reaction-button[data-tone="blue"],
+.reaction-bubble[data-tone="blue"] {
+  --reaction-tone: #a9cfff;
+  --reaction-wash: #1a2c45;
+  --reaction-rim: #507aa9;
+  --reaction-surface: #17283e;
+}
+.reaction-button[data-tone="red"],
+.reaction-bubble[data-tone="red"] {
+  --reaction-tone: #f5b7c3;
+  --reaction-wash: #39242e;
+  --reaction-rim: #986173;
+  --reaction-surface: #30212a;
+}
+.reaction-button[data-tone="blue-deep"],
+.reaction-bubble[data-tone="blue-deep"] {
+  --reaction-tone: #b4c8ed;
+  --reaction-wash: #1a2640;
+  --reaction-rim: #536b9e;
+  --reaction-surface: #101c33;
+}
+.reaction-button[data-tone="red-deep"],
+.reaction-bubble[data-tone="red-deep"] {
+  --reaction-tone: #dfb1c1;
+  --reaction-wash: #31202e;
+  --reaction-rim: #88516b;
+  --reaction-surface: #27151f;
+}
+.reaction-button[data-tone="amber"],
+.reaction-bubble[data-tone="amber"] {
+  --reaction-tone: #e7c493;
+  --reaction-wash: #342a21;
+  --reaction-rim: #92774f;
+  --reaction-surface: #2b241d;
+}
+.reaction-bubble {
+  position: absolute;
+  top: -17px;
+  right: -8px;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: max-content;
+  max-width: min(132px, calc(100% + 16px));
+  min-height: 38px;
+  padding: 4px 9px 4px 5px;
+  border: 1px solid var(--reaction-rim);
+  border-radius: 9px 9px 3px 9px;
+  background: var(--panel);
+  color: var(--reaction-tone);
+  box-shadow: 0 5px 16px #0005;
+  pointer-events: none;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: right bottom;
+  transition:
+    opacity 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    transform 180ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.reaction-bubble > .reaction-glyph {
+  width: 29px;
+  height: 29px;
+}
+.reaction-bubble > span {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+@starting-style {
+  .reaction-picker-panel {
+    opacity: 0;
+    transform: translateY(5px) scale(0.98);
+  }
+  .reaction-bubble {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .reaction-toggle:not(:disabled):hover {
+    background: var(--reaction-surface);
+    border-color: var(--reaction-rim);
+  }
+  .reaction-button:not(:disabled):hover {
+    background: var(--reaction-wash);
+    border-color: var(--reaction-rim);
+  }
+  .reaction-panel-close:not(:disabled):hover {
+    color: var(--paper);
+    background: var(--reaction-wash);
+  }
+}
+@media (max-width: 640px) {
+  .reaction-bubble {
+    top: -14px;
+    right: -5px;
+    padding: 3px 7px 3px 4px;
+    min-height: 34px;
+    max-width: min(118px, calc(100% + 10px));
+  }
+  .reaction-bubble > .reaction-glyph {
+    width: 27px;
+    height: 27px;
+  }
+  .reaction-bubble > span {
+    font-size: 10px;
+  }
+}
+:root[data-theme="light"] .reaction-area,
+:root[data-theme="light"] .reaction-bubble {
+  --reaction-tone: #405b70;
+  --reaction-wash: #e8eef4;
+  --reaction-rim: #9aafc1;
+  --reaction-surface: #f0f4f8;
+}
+:root[data-theme="light"] .reaction-button[data-tone="blue"],
+:root[data-theme="light"] .reaction-bubble[data-tone="blue"] {
+  --reaction-tone: #285e98;
+  --reaction-wash: #e3edf9;
+  --reaction-rim: #87a7ca;
+  --reaction-surface: #ebf2fb;
+}
+:root[data-theme="light"] .reaction-button[data-tone="red"],
+:root[data-theme="light"] .reaction-bubble[data-tone="red"] {
+  --reaction-tone: #9b354f;
+  --reaction-wash: #f7e5eb;
+  --reaction-rim: #c78c9d;
+  --reaction-surface: #fcf0f3;
+}
+:root[data-theme="light"] .reaction-button[data-tone="blue-deep"],
+:root[data-theme="light"] .reaction-bubble[data-tone="blue-deep"] {
+  --reaction-tone: #203f78;
+  --reaction-wash: #dce5f5;
+  --reaction-rim: #7c93ba;
+  --reaction-surface: #e3eaf6;
+}
+:root[data-theme="light"] .reaction-button[data-tone="red-deep"],
+:root[data-theme="light"] .reaction-bubble[data-tone="red-deep"] {
+  --reaction-tone: #762c4a;
+  --reaction-wash: #efdee7;
+  --reaction-rim: #b28099;
+  --reaction-surface: #f3e6ec;
+}
+:root[data-theme="light"] .reaction-button[data-tone="amber"],
+:root[data-theme="light"] .reaction-bubble[data-tone="amber"] {
+  --reaction-tone: #80581f;
+  --reaction-wash: #f4ead9;
+  --reaction-rim: #b59b72;
+  --reaction-surface: #faf3e8;
+}
+:root[data-theme="light"] .reaction-picker-panel {
+  box-shadow:
+    0 12px 40px #263b5924,
+    0 2px 8px #263b5914;
+}
+:root[data-theme="light"] .reaction-bubble {
+  box-shadow: 0 5px 16px #263b5924;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction-picker-panel,
+  .reaction-bubble {
+    transform: none;
+    transition-property: opacity;
+    transition-duration: 125ms;
+  }
+  .reaction-area
+    :is(.reaction-button, .reaction-toggle, .reaction-panel-close):not(
+      :disabled
+    ):active {
+    transform: none;
+  }
+  @starting-style {
+    .reaction-picker-panel,
+    .reaction-bubble {
+      opacity: 0;
+      transform: none;
+    }
+  }
+}
+
+.reaction-group-heading h4 {
+  margin: 0;
+  font: inherit;
+  color: var(--paper);
+}
+.reaction-group-heading > span {
+  font-size: 9px;
+  letter-spacing: 0;
+}

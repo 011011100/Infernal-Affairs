@@ -141,8 +141,74 @@ try {
       );
     }
   }
-  await action(sessions[1], { type: "emoji", emoji: "👍" });
-  assert.equal((await getView(sessions[0])).emojis.at(-1).emoji, "👍");
+  const cardsBeforeReactions = new Map(
+    await Promise.all(
+      sessions.map(async (session) => [
+        session.playerId,
+        (await getView(session)).players.map((player) => ({
+          id: player.id,
+          cards: player.cards,
+        })),
+      ]),
+    ),
+  );
+  // Four senders share the first batch; wait once before reusing them for cards.
+  const reactions = [
+    { group: "seat", id: "seat-3" },
+    { group: "role", id: "sheriff" },
+    { group: "action", id: "investigate" },
+    { group: "interaction", id: "laugh" },
+    { group: "card", id: "card-left" },
+    { group: "card", id: "card-middle" },
+    { group: "card", id: "card-right" },
+  ];
+  let lastReaction;
+  for (const [index, reaction] of reactions.entries()) {
+    if (index === sessions.length) await pause(2050);
+    const sender = sessions[index % sessions.length];
+    lastReaction = await action(sender, {
+      type: "emoji",
+      emoji: reaction.id,
+    });
+    assert.equal(lastReaction.emojis.at(-1).playerId, sender.playerId);
+  }
+  const reactionDeadline = Date.now() + 10_000;
+  while (
+    sessions.some(
+      (session) =>
+        (socketViews.get(session.playerId)?.revision ?? 0) <
+        lastReaction.revision,
+    ) &&
+    Date.now() < reactionDeadline
+  )
+    await pause(50);
+  for (const session of sessions) {
+    for (const view of [
+      await getView(session),
+      socketViews.get(session.playerId),
+    ]) {
+      assert.ok(view, "reaction broadcast must reach every websocket");
+      assert.deepEqual(view.emojis, lastReaction.emojis);
+      assert.deepEqual(
+        view.emojis.map((event) => event.emoji),
+        reactions.map((reaction) => reaction.id),
+        "all five reaction categories and three card positions must arrive unchanged",
+      );
+      for (const event of view.emojis) {
+        assert.deepEqual(Object.keys(event).sort(), [
+          "at",
+          "emoji",
+          "id",
+          "playerId",
+        ]);
+      }
+      assert.deepEqual(
+        view.players.map((player) => ({ id: player.id, cards: player.cards })),
+        cardsBeforeReactions.get(session.playerId),
+        "sending card-position signals must not change anyone's identity knowledge",
+      );
+    }
+  }
   let room = await getView(sessions[0]);
   let leaderInjuryVisible = false;
   for (let step = 0; room.status === "playing" && step < 70; step++) {
@@ -226,7 +292,9 @@ try {
     identityPrivacy: true,
     publicInvestigationPositions: true,
     privateInvestigationContent: true,
-    emojiDelivery: true,
+    reactionDelivery: true,
+    reactionGroups: [...new Set(reactions.map((reaction) => reaction.group))],
+    cardPositionSignals: true,
     leaderInjuryVisible,
     completeGame: true,
     winner: room.game.winner.team,

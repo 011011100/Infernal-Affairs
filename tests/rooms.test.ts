@@ -8,7 +8,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import test, { type TestContext } from "node:test";
 import WebSocket from "ws";
 import { createApp } from "../server/app.js";
-import { EMOJIS, type RoomView } from "../shared/room.js";
+import type { RoomView } from "../shared/room.js";
+import { REACTIONS, getReaction, isReactionId } from "../shared/reactions.js";
 import { createEquipmentDeck } from "../shared/equipment.js";
 import type { GameLog } from "../shared/types.js";
 
@@ -711,19 +712,155 @@ test("stale revisions reject atomically and successful request IDs are idempoten
   assert.equal((await f.view(host)).revision, committed.revision + 1);
 });
 
-test("emoji whitelist and cooldown apply without duplicate events or state changes on rejection", async (t) => {
+test("reaction catalog resolves current IDs and legacy display values without accepting legacy sends", () => {
+  assert.equal(REACTIONS.length, 25);
+  assert.equal(new Set(REACTIONS.map((reaction) => reaction.id)).size, 25);
+  for (const reaction of REACTIONS) {
+    assert.equal(isReactionId(reaction.id), true);
+    assert.equal(getReaction(reaction.id), reaction);
+  }
+  const legacy = [
+    ["👍", "agree"],
+    ["👎", "deny"],
+    ["🤔", "doubt"],
+    ["😂", "laugh"],
+    ["🤫", "hush"],
+    ["🎯", "lock"],
+  ];
+  for (const [value, id] of legacy) {
+    assert.equal(getReaction(value)?.id, id);
+    assert.equal(isReactionId(value), false);
+  }
+  for (const value of [
+    "seat-9",
+    "unknown",
+    "__proto__",
+    "<script>",
+    "😱",
+    "😎",
+  ]) {
+    assert.equal(getReaction(value), undefined);
+    assert.equal(isReactionId(value), false);
+  }
+});
+
+test("seat, role, action and interaction reactions broadcast over HTTP and authenticated WebSockets", async (t) => {
+  const f = await fixture(t);
+  const sessions = await f.startGame();
+  const representatives = ["seat-8", "boss", "cover", "doubt"];
+  assert.deepEqual(
+    representatives.map((id) => getReaction(id)?.group),
+    ["seat", "role", "action", "interaction"],
+  );
+  let last: RoomView | undefined;
+  for (const [index, id] of representatives.entries()) {
+    last = await f.action(sessions[index], { type: "emoji", emoji: id });
+    assert.equal(last.emojis.at(-1)?.playerId, sessions[index].playerId);
+    assert.equal(last.emojis.at(-1)?.emoji, id);
+  }
+  for (const [index, session] of sessions.entries()) {
+    await eventually(
+      () =>
+        f.peers[index].messages.some(
+          (message) => message.room?.revision === last!.revision,
+        ),
+      "all reaction groups delivered by websocket",
+    );
+    const websocket = f.peers[index].messages.findLast(
+      (message) => message.room?.revision === last!.revision,
+    )!.room!;
+    for (const room of [await f.view(session), websocket]) {
+      assert.deepEqual(room.emojis, last!.emojis);
+      assert.deepEqual(
+        room.emojis.map((event) => event.emoji),
+        representatives,
+      );
+      assertPrivateProjection(room, session, sessions, f);
+    }
+  }
+});
+
+test("left, middle and right card signals broadcast without revealing or investigating any identity", async (t) => {
+  const f = await fixture(t);
+  const sessions = await f.startGame();
+  const gameBefore = structuredClone(f.service.get(sessions[0].room.code).game);
+  const cardSignals = ["card-left", "card-middle", "card-right"];
+  assert.deepEqual(
+    cardSignals.map((id) => getReaction(id)?.label),
+    ["左", "中", "右"],
+  );
+  for (const id of cardSignals) {
+    assert.equal(getReaction(id)?.group, "card");
+    assert.equal(getReaction(id)?.tone, "neutral");
+  }
+  let last: RoomView | undefined;
+  for (const [index, id] of cardSignals.entries()) {
+    last = await f.action(sessions[index], { type: "emoji", emoji: id });
+  }
+  assert.deepEqual(f.service.get(sessions[0].room.code).game, gameBefore);
+  for (const [index, session] of sessions.entries()) {
+    await eventually(
+      () =>
+        f.peers[index].messages.some(
+          (message) => message.room?.revision === last!.revision,
+        ),
+      "three card-position signals delivered by websocket",
+    );
+    const websocket = f.peers[index].messages.findLast(
+      (message) => message.room?.revision === last!.revision,
+    )!.room!;
+    for (const room of [await f.view(session), websocket]) {
+      assert.deepEqual(room.emojis, last!.emojis);
+      assert.deepEqual(
+        room.emojis.map((event) => event.emoji),
+        cardSignals,
+      );
+      for (const [eventIndex, event] of room.emojis.entries()) {
+        assert.equal(event.playerId, sessions[eventIndex].playerId);
+        assert.deepEqual(Object.keys(event).sort(), [
+          "at",
+          "emoji",
+          "id",
+          "playerId",
+        ]);
+      }
+      assertPrivateProjection(room, session, sessions, f);
+    }
+  }
+});
+
+test("reaction whitelist and cooldown apply without duplicate events or state changes on rejection", async (t) => {
   const f = await fixture(t);
   const host = await f.create();
-  const invalid = await f.request(host, {
-    type: "emoji",
-    emoji: "<script>alert(1)</script>",
-  });
-  assert.equal(invalid.statusCode, 400);
   const initial = await f.view(host);
+  const rawBefore = structuredClone(f.service.get(host.room.code));
+  for (const value of [
+    "<script>alert(1)</script>",
+    "seat-9",
+    "card-up",
+    "unknown",
+    "__proto__",
+    "👍",
+    "👎",
+    "🤔",
+    "😱",
+    "😂",
+    "😎",
+    "🤫",
+    "🎯",
+    null,
+    1,
+    {},
+  ]) {
+    const invalid = await f.request(host, { type: "emoji", emoji: value });
+    assert.equal(invalid.statusCode, 400);
+    assert.deepEqual(f.service.get(host.room.code), rawBefore);
+  }
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
   const requestId = randomUUID();
   const sent = await f.request(
     host,
-    { type: "emoji", emoji: EMOJIS[0] },
+    { type: "emoji", emoji: "agree" },
     -1,
     requestId,
   );
@@ -735,18 +872,26 @@ test("emoji whitelist and cooldown apply without duplicate events or state chang
   const after = await f.view(host);
   assert.equal(after.revision, initial.revision + 1);
   assert.equal(after.emojis.length, 1);
-  assert.equal(after.emojis[0].emoji, EMOJIS[0]);
+  assert.equal(after.emojis[0].emoji, "agree");
+  t.mock.timers.tick(1999);
   assert.equal(
-    (await f.request(host, { type: "emoji", emoji: EMOJIS[1] })).statusCode,
+    (await f.request(host, { type: "emoji", emoji: "deny" })).statusCode,
     429,
   );
   assert.deepEqual(await f.view(host), after);
   assert.equal(
-    (await f.request(host, { type: "emoji", emoji: EMOJIS[0] }, -1, requestId))
+    (await f.request(host, { type: "emoji", emoji: "agree" }, -1, requestId))
       .statusCode,
     200,
   );
   assert.deepEqual(await f.view(host), after);
+  t.mock.timers.tick(1);
+  const later = await f.action(host, { type: "emoji", emoji: "deny" });
+  assert.equal(later.revision, after.revision + 1);
+  assert.deepEqual(
+    later.emojis.map((event) => event.emoji),
+    ["agree", "deny"],
+  );
 });
 
 test("the same session token reconnects to its retained seat and private hand", async (t) => {
@@ -801,7 +946,7 @@ test("SQLite restart preserves game, private identity, revision and idempotency 
     (
       await first.request(
         session,
-        { type: "emoji", emoji: EMOJIS[2] },
+        { type: "emoji", emoji: "doubt" },
         undefined,
         requestId,
       )
@@ -825,7 +970,7 @@ test("SQLite restart preserves game, private identity, revision and idempotency 
   assert.deepEqual(restored.game, before.game);
   const duplicate = await second.request(
     session,
-    { type: "emoji", emoji: EMOJIS[2] },
+    { type: "emoji", emoji: "doubt" },
     -1,
     requestId,
   );
@@ -930,6 +1075,19 @@ test("authenticated gameplay completes arm, turn rotation, shoot and server-only
   assert.equal(settled.game!.gunSupply, initial.game!.gunSupply);
   assert.equal(settled.game!.pendingShot, undefined);
   assert.equal(settled.status, "playing");
+  const victimSession = sessions.find(
+    (session) => session.playerId === victim.id,
+  )!;
+  const beforeRejectedReaction = structuredClone(
+    f.service.get(shooter.room.code),
+  );
+  const rejected = await f.request(victimSession, {
+    type: "emoji",
+    emoji: "lock",
+  });
+  assert.equal(rejected.statusCode, 400);
+  assert.equal(rejected.json().error, "出局后请安静观战");
+  assert.deepEqual(f.service.get(shooter.room.code), beforeRejectedReaction);
 });
 
 test("a complete room reaches leader defeat, reveals the table and starts a fresh rematch", async (t) => {
@@ -998,6 +1156,19 @@ test("a complete room reaches leader defeat, reveals the table and starts a fres
   assert.equal(room.status, "finished");
   assert.equal(room.game!.winner!.team, "honest");
   assert.ok(room.players.every((p) => p.cards.every((c) => c.value !== null)));
+  const survivor = sessions.find((session) =>
+    room.players.some(
+      (player) => player.id === session.playerId && player.alive,
+    ),
+  )!;
+  const finishedState = structuredClone(f.service.get(host.room.code));
+  const endedReaction = await f.request(survivor, {
+    type: "emoji",
+    emoji: "agree",
+  });
+  assert.equal(endedReaction.statusCode, 400);
+  assert.equal(endedReaction.json().error, "对局已结束，不能发送信号");
+  assert.deepEqual(f.service.get(host.room.code), finishedState);
   assert.equal(
     (await f.request(sessions[1], { type: "rematch" })).statusCode,
     403,

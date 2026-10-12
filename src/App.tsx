@@ -47,7 +47,9 @@ import type { EquipmentCard, GameLog } from "../shared/types";
 import RulesManual from "./RulesManual";
 import { ThemeToggle, useTheme } from "./Theme";
 import type { RoomView } from "../shared/room";
-import { AVATARS, EMOJIS } from "../shared/room";
+import { AVATARS } from "../shared/room";
+import type { ReactionId } from "../shared/reactions";
+import ReactionPicker, { ReactionBubble } from "./ReactionPicker";
 import {
   investigationBaseline,
   isInvestigationCueActive,
@@ -887,7 +889,7 @@ function PlayerSeat({
   currentId,
   myId,
   players,
-  emoji,
+  reaction,
   shotTarget,
   onClick,
   selectable = false,
@@ -900,7 +902,7 @@ function PlayerSeat({
   currentId: string;
   myId: string;
   players: Player[];
-  emoji?: string;
+  reaction?: RoomView["emojis"][number];
   shotTarget?: string;
   onClick?: () => void;
   selectable?: boolean;
@@ -1011,10 +1013,12 @@ function PlayerSeat({
         )}
       </div>
       <div className="gun-dock" data-gun-dock={player.id} aria-hidden="true" />
-      {emoji && (
-        <span className="floating-emoji" key={emoji}>
-          {emoji}
-        </span>
+      {reaction && (
+        <ReactionBubble
+          key={reaction.id}
+          event={reaction}
+          sender={player.name}
+        />
       )}
     </div>
   );
@@ -1135,8 +1139,7 @@ function Game({
   const [equipment, setEquipment] = useState<EquipmentCard | null>(null);
   const [otherTargetId, setOtherTargetId] = useState("");
   const [otherCardIndex, setOtherCardIndex] = useState<number | undefined>();
-  const [emojiOpen, setEmojiOpen] = useState(false);
-  const [emojiCooldown, setEmojiCooldown] = useState(false);
+  const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0);
   const [showResult, setShowResult] = useState(true);
   const [now, setNow] = useState(Date.now());
   const isTurn = game.currentPlayerId === meId;
@@ -1234,16 +1237,20 @@ function Game({
   };
   const closeMode = useCallback(() => setMode(null), []);
   const closeEquipment = useCallback(() => setEquipment(null), []);
-  const recentEmoji = (playerId: string) =>
+  const recentReaction = (playerId: string) =>
     room.emojis
       .filter((e) => e.playerId === playerId && now - e.at < 4000)
-      .at(-1)?.emoji;
-  const sendEmoji = (emoji: string) => {
-    if (emojiCooldown) return;
-    onAction({ type: "emoji", emoji });
-    setEmojiOpen(false);
-    setEmojiCooldown(true);
-    window.setTimeout(() => setEmojiCooldown(false), 2100);
+      .at(-1);
+  const sendReaction = (id: ReactionId) => {
+    if (
+      busy ||
+      !me.alive ||
+      room.status !== "playing" ||
+      Date.now() < reactionCooldownUntil
+    )
+      return;
+    onAction({ type: "emoji", emoji: id });
+    setReactionCooldownUntil(Date.now() + 2100);
   };
   function submitMode() {
     if (!mode) return;
@@ -1402,7 +1409,7 @@ function Game({
                 plantedEvidence={
                   game.players.find((p) => p.id === player.id)?.plantedEvidence
                 }
-                emoji={recentEmoji(player.id)}
+                reaction={recentReaction(player.id)}
                 shotTarget={pending?.targetId}
                 investigations={activeInvestigations}
               />
@@ -1706,35 +1713,16 @@ function Game({
             <div ref={logEnd} />
           </div>
         </section>
-        <div className="emoji-area">
-          {emojiOpen && (
-            <div className="emoji-tray">
-              {EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  aria-label={`发送表情 ${emoji}`}
-                  onClick={() => sendEmoji(emoji)}
-                  disabled={emojiCooldown || busy}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
-          <button
-            className="emoji-toggle"
-            onClick={() => setEmojiOpen(!emojiOpen)}
-            disabled={emojiCooldown || !me.alive || room.status === "finished"}
-            aria-expanded={emojiOpen}
-          >
-            <Smile size={18} />
-            <span>
-              {emojiCooldown ? "稍等一下，再发表情" : "发个表情，试探一下"}
-            </span>
-            <ChevronDown size={15} />
-          </button>
-          <span className="emoji-note">表情对所有人可见</span>
-        </div>
+        <ReactionPicker
+          disabled={!me.alive || room.status === "finished"}
+          disabledReason={
+            room.status === "finished" ? "对局已结束" : "出局后请安静观战"
+          }
+          busy={busy}
+          cooldown={now < reactionCooldownUntil}
+          latest={recentReaction(meId)}
+          onSend={sendReaction}
+        />
       </aside>
       {mode && (
         <Modal

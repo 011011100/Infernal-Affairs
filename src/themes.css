@@ -165,7 +165,6 @@
     .live-tag,
     .game-log p,
     .game-log time,
-    .emoji-note,
     .modal-heading .eyebrow,
     .modal-description,
     .modal .field-label,
@@ -425,7 +424,6 @@
   :is(
     .equipment-card,
     .action-buttons > button,
-    .emoji-toggle,
     .target-players > button,
     .equipment-description,
     .equipment-choices > button,
@@ -455,14 +453,6 @@
 }
 :root[data-theme="light"] :is(.game-logs, .modal) {
   scrollbar-color: #a2b3cb transparent;
-}
-:root[data-theme="light"] .emoji-tray {
-  background: #fff;
-  border-color: #b8c9de;
-  box-shadow: 0 8px 22px #253d6022;
-}
-:root[data-theme="light"] .emoji-tray > button:hover {
-  background: #e8eef6;
 }
 :root[data-theme="light"] .modal-backdrop {
   background: #34476659;
