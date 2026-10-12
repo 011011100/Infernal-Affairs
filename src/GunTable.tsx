@@ -67,6 +67,38 @@ const BARREL_OFFSET = new Vector3(0, 0.21669, -0.000096).applyQuaternion(
   TOP_VIEW,
 ).y;
 
+function stackLayout(
+  count: number,
+  narrow: boolean,
+  height: number,
+  depth: number,
+) {
+  const bounds = new Box3();
+  const poses = Array.from({ length: count }, (_, index) => {
+    const offset = index - (count - 1) / 2;
+    const rotation = new Quaternion()
+      .setFromAxisAngle(
+        Z_AXIS,
+        (narrow ? Math.PI / 2 : 0) + (offset * Math.PI) / 9,
+      )
+      .multiply(SIDE_VIEW);
+    const position = new Vector3(offset * 0.1, offset * 0.11, offset * 0.4);
+    for (const x of [-0.5, 0.5]) {
+      for (const y of [-height / 2, height / 2]) {
+        for (const z of [-depth / 2, depth / 2]) {
+          bounds.expandByPoint(
+            new Vector3(x, y, z).applyQuaternion(rotation).add(position),
+          );
+        }
+      }
+    }
+    return { position, rotation };
+  });
+  const middle = bounds.getCenter(new Vector3());
+  for (const pose of poses) pose.position.sub(middle);
+  return { poses, size: bounds.getSize(new Vector3()) };
+}
+
 function snapshotKey(props: GunTableProps) {
   return JSON.stringify([
     props.syncKey,
@@ -370,35 +402,20 @@ function createRuntime(
     }
     const publicSlots = slots.filter((slot) => !slot.ownerId);
     const publicCount = Math.max(1, publicSlots.length);
-    const horizontalRack = rack.width > rack.height * 1.5;
-    const rackGap = horizontalRack ? 16 : 0;
-    const columnWidth =
-      (rack.width - rackGap * (publicCount - 1)) / publicCount;
-    const rowHeight = rack.height / publicCount;
-    const rackScale = horizontalRack
-      ? Math.min(columnWidth, (rack.height * 0.94) / modelHeight, 144)
-      : Math.min(rack.width * 0.9, (rowHeight * 0.86) / modelHeight, 144);
-    // Once players hold guns, keep the remaining supply in the horizontal
-    // gaps between seats. Re-centering a single gun directly below a middle
-    // holder otherwise puts two weapons on top of each other.
-    const columnCenters = [...seatElements.values()]
-      .map((seat) => center(localRect(seat)).x)
-      .sort((a, b) => a - b)
-      .filter((x, index, all) => index === 0 || x - all[index - 1] > 2);
-    const gaps = columnCenters
-      .slice(1)
-      .map((x, index) => (x + columnCenters[index]) / 2);
-    const supplyColumns =
-      horizontalRack &&
-      slots.some((slot) => slot.ownerId) &&
-      gaps.length >= publicCount
-        ? gaps
-            .sort(
-              (a, b) => Math.abs(a - rackCenter.x) - Math.abs(b - rackCenter.x),
-            )
-            .slice(0, publicCount)
-            .sort((a, b) => a - b)
-        : null;
+    const narrowRack = rack.width < rack.height;
+    const stack = stackLayout(publicCount, narrowRack, modelHeight, modelDepth);
+    // Fit the whole pile, and keep its model size stable as guns are taken.
+    const fullStack = stackLayout(
+      Math.max(1, slots.length),
+      narrowRack,
+      modelHeight,
+      modelDepth,
+    );
+    const rackScale = Math.min(
+      148,
+      (rack.width * 0.94) / fullStack.size.x,
+      (rack.height * 0.94) / fullStack.size.y,
+    );
     const heldScale = window.matchMedia("(max-width: 640px)").matches ? 78 : 96;
     const present = new Set(slots.map((slot) => slot.id));
     for (const [id, visual] of visuals) {
@@ -417,15 +434,26 @@ function createRuntime(
         0,
         publicSlots.findIndex((item) => item.id === slot.id),
       );
+      // The reconciler claims the first free slot, so keep it on top of the pile.
+      const stacked = stack.poses[publicCount - 1 - row]!;
       const position = dockRect
         ? center(dockRect)
         : {
-            x: horizontalRack
-              ? (supplyColumns?.[row] ??
-                rack.x + columnWidth / 2 + (columnWidth + rackGap) * row)
-              : rackCenter.x,
-            y: horizontalRack ? rackCenter.y : rack.y + rowHeight * (row + 0.5),
+            x: rackCenter.x + stacked.position.x * rackScale,
+            y: rackCenter.y - stacked.position.y * rackScale,
           };
+      // A middle seat's held gun sits beside the pile instead of covering it.
+      if (dockRect && publicSlots.length && !narrowRack) {
+        const clearanceX = (stack.size.x * rackScale) / 2 + heldScale / 2 + 12;
+        const clearanceY = (stack.size.y * rackScale) / 2 + heldScale / 2 + 8;
+        if (
+          Math.abs(position.x - rackCenter.x) < clearanceX &&
+          Math.abs(position.y - rackCenter.y) < clearanceY
+        ) {
+          const direction = position.x < rackCenter.x ? -1 : 1;
+          position.x = rackCenter.x + direction * clearanceX;
+        }
+      }
       const target = slot.targetId ? seatElements.get(slot.targetId) : null;
       const targetName = target?.querySelector<HTMLElement>(".player-name-row");
       if (targetName) anchors.add(targetName);
@@ -450,9 +478,13 @@ function createRuntime(
               Math.atan2(deltaY, deltaX) - barrelCorrection,
             )
             .multiply(TOP_VIEW)
-        : SIDE_VIEW.clone();
+        : stacked.rotation;
       const pose: Pose = {
-        position: new Vector3(position.x, -position.y, 0),
+        position: new Vector3(
+          position.x,
+          -position.y,
+          dockRect ? 220 : stacked.position.z * rackScale,
+        ),
         rotation,
         scale,
       };
@@ -553,7 +585,7 @@ function createRuntime(
         visual.shadow.position.set(
           model.position.x + 2,
           model.position.y - 3,
-          -120,
+          -200,
         );
         visual.shadow.rotation.z = heading;
         visual.shadow.scale.set(

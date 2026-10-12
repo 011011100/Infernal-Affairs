@@ -4,11 +4,11 @@
   align-items: start;
 }
 .game-table .table-center {
-  width: min(480px, calc(100% - 40px));
+  width: min(260px, calc(100% - 40px));
 }
 .gun-rack {
   width: 100%;
-  height: 82px;
+  height: 130px;
   flex: none;
   pointer-events: none;
 }
@@ -76,7 +76,7 @@
   }
   .gun-rack {
     width: 220px;
-    height: 54px;
+    height: 96px;
   }
   .gun-dock {
     width: 86px;
