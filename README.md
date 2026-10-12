@@ -11,6 +11,7 @@
 - SQLite 持久化对局；刷新或服务重启后，使用原浏览器中保存的身份令牌重连。
 - 射击留 6 秒装备响应时间；离线玩家阻塞操作满 60 秒，房主可跳过等待。
 - 六章行动手册，包含可播放、暂停和逐步查看的身份、回合、调查、射击及换牌演示，以及 16 种装备速查和常见问题。教学使用独立示例，不影响当前对局。
+- Three.js 沙鹰模型：公共枪在桌心侧放，拿枪后平滑移动至玩家席位并转为俯视，枪口跟随瞄准目标；射击或失去枪械后返回桌心。按 4 / 5—6 / 7—8 人分别展示 2 / 3 / 4 把枪，支持日夜模式及减少动态效果偏好。静止时停止渲染，不支持 WebGL 时仍可通过文字查看和操作枪械。
 
 规则以经典 16 张装备为基础，采用出版商后续修订卡效，并包含明确的线上时序适配。版本区别和来源见 [规则说明](docs/rules.md)。这不是扩展合集。
 
@@ -57,6 +58,16 @@ node scripts/smoke-online.mjs https://你的游戏域名
 此脚本验证身份隔离、四条鉴权 WebSocket、表情同步、完整首领击败及终局揭牌。它不替代浏览器中的交互检查。
 
 Zeabur 官方说明：[Dockerfile 部署](https://zeabur.com/docs/en-US/deploy/methods/dockerfile)、[端口配置](https://zeabur.com/docs/en-US/deploy/networking/public-networking)、[持久化存储](https://zeabur.com/docs/en-US/operations/data/volumes)。
+
+## 3D 模型
+
+沙鹰由 TastyTony 制作，遵循 CC BY 4.0，来源、修改和许可见 [模型署名](public/models/ATTRIBUTION.md)。游戏中使用转换后的静态 GLB，多把枪共享几何与材质，进入对局时才加载渲染组件。
+
+使用原始下载文件重新生成资源：
+
+```sh
+node scripts/prepare-gun-model.mjs /path/to/low-poly_desert_eagle.glb
+```
 
 ## 代码结构
 

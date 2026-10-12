@@ -297,6 +297,25 @@ export default function RulesManual({ onClose }: { onClose: () => void }) {
         <p className="manual-edition">
           本手册对应当前线上版：4—8 人 · 经典 16 种装备 · 6 秒射击响应。
         </p>
+        <p className="manual-edition">
+          3D 枪械：
+          <a
+            href="https://sketchfab.com/3d-models/low-poly-desert-eagle-b81da261345f4462b2c4412352162287"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Low-Poly Desert Eagle
+          </a>
+          ，作者 TastyTony ·{" "}
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            CC BY 4.0
+          </a>
+          。已转换材质、移除骨骼并调整尺寸与朝向。
+        </p>
       </div>
     </div>
   );

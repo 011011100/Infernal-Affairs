@@ -420,6 +420,10 @@
   line-height: 1.8;
   text-align: center;
 }
+.manual-edition a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
 @keyframes manual-enter {
   from {
     opacity: 0;

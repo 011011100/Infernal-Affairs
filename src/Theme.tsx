@@ -52,10 +52,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function ThemeToggle() {
+export function useTheme() {
   const context = useContext(ThemeContext);
-  if (!context) throw new Error("ThemeToggle requires ThemeProvider");
-  const { theme, toggle } = context;
+  if (!context) throw new Error("useTheme requires ThemeProvider");
+  return context;
+}
+
+export function ThemeToggle() {
+  const { theme, toggle } = useTheme();
   const isLight = theme === "light";
   const label = `切换到${isLight ? "黑夜" : "白天"}模式`;
   return (

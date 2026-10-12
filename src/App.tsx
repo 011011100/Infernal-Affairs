@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -37,7 +45,7 @@ import {
 } from "lucide-react";
 import type { EquipmentCard, GameLog } from "../shared/types";
 import RulesManual from "./RulesManual";
-import { ThemeToggle } from "./Theme";
+import { ThemeToggle, useTheme } from "./Theme";
 import type { RoomView } from "../shared/room";
 import { AVATARS, EMOJIS } from "../shared/room";
 import {
@@ -47,6 +55,10 @@ import {
 } from "./investigationCue";
 
 type Session = { code: string; token: string; playerId: string };
+// The optional 3D chunk must never prevent a weak-network client from playing.
+const GunTable = lazy(() =>
+  import("./GunTable").catch(() => ({ default: () => <></> })),
+);
 type Player = RoomView["players"][number];
 type Connection = "connecting" | "connected" | "reconnecting" | "offline";
 type Action = Record<string, unknown> & { type: string };
@@ -899,6 +911,7 @@ function PlayerSeat({
   return (
     <div
       className={`player-seat ${player.id === currentId ? "current-seat" : ""} ${player.id === myId ? "my-seat" : ""} ${!player.alive ? "eliminated-seat" : ""} ${player.alive && player.wounded ? "wounded-seat" : ""} ${selectable ? "targetable-seat" : ""} ${selected ? "selected-seat" : ""} ${shotTarget === player.id ? "under-fire" : ""} ${investigations.some((event) => event.targetId === player.id) ? "inspected-seat" : ""}`}
+      data-player-id={player.id}
       onClick={selectable ? onClick : undefined}
       role={selectable ? "button" : undefined}
       tabIndex={selectable ? 0 : undefined}
@@ -996,6 +1009,7 @@ function PlayerSeat({
           </span>
         )}
       </div>
+      <div className="gun-dock" data-gun-dock={player.id} aria-hidden="true" />
       {emoji && (
         <span className="floating-emoji" key={emoji}>
           {emoji}
@@ -1099,6 +1113,18 @@ function Game({
 }) {
   const game = room.game!;
   const players = room.players;
+  const { theme } = useTheme();
+  const tableRef = useRef<HTMLDivElement>(null);
+  const gunPlayers = useMemo(
+    () =>
+      players.map(({ id, armed, aimingAt, alive }) => ({
+        id,
+        armed,
+        aimingAt,
+        alive,
+      })),
+    [players],
+  );
   const me = players.find((p) => p.id === meId)!;
   const [mode, setMode] = useState<
     "investigate" | "arm" | "equip" | "aim" | "shoot" | null
@@ -1347,15 +1373,10 @@ function Game({
             </div>
           </section>
         )}
-        <div className={`game-table players-${players.length}`}>
+        <div ref={tableRef} className={`game-table players-${players.length}`}>
           <div className="table-lines" aria-hidden="true" />
           <div className="table-center">
-            <div className="table-emblem">
-              <Shield size={48} strokeWidth={0.7} />
-              <Fingerprint size={25} strokeWidth={0.9} />
-            </div>
-            <span className="table-center-title">无间风云</span>
-            <span className="table-center-en">TRUST IS A LOADED GUN.</span>
+            <div className="gun-rack" data-gun-rack aria-hidden="true" />
             <div className="gun-supply">
               <Crosshair size={13} />
               <span>枪械余量</span>
@@ -1386,6 +1407,15 @@ function Game({
               />
             ))}
           </div>
+          <Suspense fallback={null}>
+            <GunTable
+              players={gunPlayers}
+              gunSupply={game.gunSupply}
+              syncKey={`${room.code}:${syncEpoch}`}
+              theme={theme}
+              tableRef={tableRef}
+            />
+          </Suspense>
         </div>
         <section className="my-dossier">
           <div className="dossier-heading">
