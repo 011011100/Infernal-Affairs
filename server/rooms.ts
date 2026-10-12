@@ -14,7 +14,7 @@ import {
 } from "./game.js";
 import type { GameState, GameAction } from "../shared/types.js";
 import { AVATARS, type RoomView } from "../shared/room.js";
-import { isReactionId } from "../shared/reactions.js";
+import { isReactionSelection } from "../shared/reactions.js";
 import { RoomStore } from "./store.js";
 
 interface Member {
@@ -277,8 +277,11 @@ export class RoomService {
         );
         break;
       }
-      case "emoji":
-        if (!isReactionId(body.emoji)) throw new RoomError("不支持这个表情");
+      case "emoji": {
+        const hasSelection = Object.hasOwn(body, "reactions");
+        const selection = hasSelection ? body.reactions : [body.emoji];
+        if (!isReactionSelection(selection))
+          throw new RoomError("请选择 1～3 个不同的有效信号");
         if (room.game?.status === "finished")
           throw new RoomError("对局已结束，不能发送信号");
         if (Date.now() - self.lastEmoji < 2000)
@@ -295,11 +298,13 @@ export class RoomService {
           {
             id: randomUUID(),
             playerId: self.id,
-            emoji: body.emoji,
+            emoji: selection[0],
+            ...(hasSelection ? { reactions: [...selection] } : {}),
             at: Date.now(),
           },
         ].slice(-48);
         break;
+      }
       case "skip": {
         hostOnly();
         if (!room.game) throw new RoomError("对局尚未开始");

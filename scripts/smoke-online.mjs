@@ -172,6 +172,20 @@ try {
     });
     assert.equal(lastReaction.emojis.at(-1).playerId, sender.playerId);
   }
+  const combination = ["seat-3", "card-left", "good"];
+  const previousCount = lastReaction.emojis.length;
+  // The fourth sender has cooled down while the three card signals were sent.
+  lastReaction = await action(sessions[3], {
+    type: "emoji",
+    reactions: combination,
+  });
+  assert.equal(
+    lastReaction.emojis.length,
+    previousCount + 1,
+    "a combination is exactly one event",
+  );
+  assert.deepEqual(lastReaction.emojis.at(-1).reactions, combination);
+  assert.equal(lastReaction.emojis.at(-1).playerId, sessions[3].playerId);
   const reactionDeadline = Date.now() + 10_000;
   while (
     sessions.some(
@@ -190,11 +204,23 @@ try {
       assert.ok(view, "reaction broadcast must reach every websocket");
       assert.deepEqual(view.emojis, lastReaction.emojis);
       assert.deepEqual(
-        view.emojis.map((event) => event.emoji),
+        view.emojis.slice(0, -1).map((event) => event.emoji),
         reactions.map((reaction) => reaction.id),
         "all five reaction categories and three card positions must arrive unchanged",
       );
-      for (const event of view.emojis) {
+      assert.deepEqual(
+        view.emojis.at(-1).reactions,
+        combination,
+        "the complete ordered combination must reach every player together",
+      );
+      assert.deepEqual(Object.keys(view.emojis.at(-1)).sort(), [
+        "at",
+        "emoji",
+        "id",
+        "playerId",
+        "reactions",
+      ]);
+      for (const event of view.emojis.slice(0, -1)) {
         assert.deepEqual(Object.keys(event).sort(), [
           "at",
           "emoji",
@@ -295,6 +321,7 @@ try {
     reactionDelivery: true,
     reactionGroups: [...new Set(reactions.map((reaction) => reaction.group))],
     cardPositionSignals: true,
+    combinedReactionDelivery: true,
     leaderInjuryVisible,
     completeGame: true,
     winner: room.game.winner.team,

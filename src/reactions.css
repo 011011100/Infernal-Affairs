@@ -1,5 +1,7 @@
 .reaction-area,
-.reaction-bubble {
+.reaction-bubble,
+.reaction-draft-token,
+.reaction-bubble-part {
   --reaction-tone: #c4d6e4;
   --reaction-wash: #202c38;
   --reaction-rim: #5e778a;
@@ -55,12 +57,11 @@
 .reaction-picker-panel {
   position: fixed;
   z-index: 35;
+  display: flex;
+  flex-direction: column;
   width: min(320px, calc(100vw - 32px));
   max-height: min(740px, calc(100dvh - 32px));
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--reaction-rim) transparent;
+  overflow: hidden;
   border: 1px solid var(--reaction-rim);
   border-radius: 12px;
   background: var(--panel);
@@ -76,10 +77,10 @@
     transform 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 }
 .reaction-panel-header {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 1;
   display: flex;
+  flex: none;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -118,8 +119,15 @@
 }
 .reaction-groups {
   display: grid;
+  flex: 1 1 auto;
   gap: 12px;
+  min-height: 0;
   padding: 14px 12px 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--reaction-rim) transparent;
 }
 .reaction-group {
   min-width: 0;
@@ -189,21 +197,36 @@
   background: var(--reaction-wash);
 }
 .reaction-area
-  :is(.reaction-button, .reaction-toggle, .reaction-panel-close):focus-visible {
+  :is(
+    .reaction-button,
+    .reaction-toggle,
+    .reaction-panel-close,
+    .reaction-clear,
+    .reaction-draft-token,
+    .reaction-send
+  ):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .reaction-area
-  :is(.reaction-button, .reaction-toggle, .reaction-panel-close):not(
-    :disabled
-  ):active {
+  :is(
+    .reaction-button,
+    .reaction-toggle,
+    .reaction-panel-close,
+    .reaction-clear,
+    .reaction-draft-token,
+    .reaction-send
+  ):not(:disabled):active {
   transform: scale(0.97);
 }
 .reaction-area
   :is(
     .reaction-button,
     .reaction-toggle,
-    .reaction-panel-close
+    .reaction-panel-close,
+    .reaction-clear,
+    .reaction-draft-token,
+    .reaction-send
   ):focus-visible:active {
   transform: none;
 }
@@ -211,8 +234,7 @@
   transition: none;
 }
 .reaction-panel-status {
-  position: sticky;
-  bottom: 0;
+  flex: none;
   margin: 0;
   padding: 10px 14px;
   border-top: 1px solid var(--line);
@@ -220,6 +242,136 @@
   color: var(--muted);
   font-size: 10px;
   line-height: 1.65;
+}
+.reaction-composer {
+  flex: none;
+  min-width: 0;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.reaction-draft-heading,
+.reaction-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+.reaction-draft-heading {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.reaction-clear {
+  min-height: 26px;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+}
+.reaction-draft {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 54px;
+  min-height: 54px;
+  margin-bottom: 10px;
+}
+.reaction-draft-token {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 4px 12px 4px 7px;
+  border: 1px solid var(--reaction-rim);
+  border-radius: 7px;
+  background: var(--reaction-wash);
+  color: var(--reaction-tone);
+}
+.reaction-draft-token > .reaction-glyph {
+  width: 25px;
+  height: 25px;
+}
+.reaction-draft-token > span {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.reaction-draft-token > svg:not(.reaction-glyph) {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  opacity: 0.65;
+}
+.reaction-separator {
+  flex: none;
+  width: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  text-align: center;
+}
+.reaction-draft-empty {
+  flex: 1;
+  margin: 0;
+  padding: 16px 8px;
+  border: 1px dashed var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.8;
+  text-align: center;
+}
+.reaction-compose-hint {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.reaction-send {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 88px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--reaction-rim);
+  border-radius: 6px;
+  background: var(--reaction-wash);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.reaction-clear,
+.reaction-draft-token,
+.reaction-send {
+  touch-action: manipulation;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 120ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.reaction-clear:disabled,
+.reaction-draft-token:disabled,
+.reaction-send:disabled {
+  opacity: 0.46;
 }
 .reaction-glyph {
   display: block;
@@ -269,35 +421,45 @@
   letter-spacing: -1px;
 }
 .reaction-button[data-tone="blue"],
-.reaction-bubble[data-tone="blue"] {
+.reaction-bubble[data-tone="blue"],
+.reaction-draft-token[data-tone="blue"],
+.reaction-bubble-part[data-tone="blue"] {
   --reaction-tone: #a9cfff;
   --reaction-wash: #1a2c45;
   --reaction-rim: #507aa9;
   --reaction-surface: #17283e;
 }
 .reaction-button[data-tone="red"],
-.reaction-bubble[data-tone="red"] {
+.reaction-bubble[data-tone="red"],
+.reaction-draft-token[data-tone="red"],
+.reaction-bubble-part[data-tone="red"] {
   --reaction-tone: #f5b7c3;
   --reaction-wash: #39242e;
   --reaction-rim: #986173;
   --reaction-surface: #30212a;
 }
 .reaction-button[data-tone="blue-deep"],
-.reaction-bubble[data-tone="blue-deep"] {
+.reaction-bubble[data-tone="blue-deep"],
+.reaction-draft-token[data-tone="blue-deep"],
+.reaction-bubble-part[data-tone="blue-deep"] {
   --reaction-tone: #b4c8ed;
   --reaction-wash: #1a2640;
   --reaction-rim: #536b9e;
   --reaction-surface: #101c33;
 }
 .reaction-button[data-tone="red-deep"],
-.reaction-bubble[data-tone="red-deep"] {
+.reaction-bubble[data-tone="red-deep"],
+.reaction-draft-token[data-tone="red-deep"],
+.reaction-bubble-part[data-tone="red-deep"] {
   --reaction-tone: #dfb1c1;
   --reaction-wash: #31202e;
   --reaction-rim: #88516b;
   --reaction-surface: #27151f;
 }
 .reaction-button[data-tone="amber"],
-.reaction-bubble[data-tone="amber"] {
+.reaction-bubble[data-tone="amber"],
+.reaction-draft-token[data-tone="amber"],
+.reaction-bubble-part[data-tone="amber"] {
   --reaction-tone: #e7c493;
   --reaction-wash: #342a21;
   --reaction-rim: #92774f;
@@ -340,6 +502,45 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* Leave room inside the clipped table for a complete first-row signal. */
+.game-table .players-ring {
+  padding-top: 28px;
+}
+.reaction-bubble[data-combined="true"] {
+  top: -40px;
+  right: -6px;
+  gap: 3px;
+  width: 144px;
+  max-width: none;
+  padding: 5px;
+}
+.reaction-bubble > .reaction-bubble-part {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: visible;
+  color: var(--reaction-tone);
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: clip;
+}
+.reaction-bubble-part > .reaction-glyph {
+  width: 28px;
+  height: 28px;
+}
+.reaction-bubble-part > span {
+  white-space: nowrap;
+}
+.reaction-bubble > .reaction-separator {
+  width: 6px;
+  overflow: visible;
+  font-size: 9px;
+  font-weight: 400;
+  text-overflow: clip;
+}
 @starting-style {
   .reaction-picker-panel {
     opacity: 0;
@@ -363,8 +564,20 @@
     color: var(--paper);
     background: var(--reaction-wash);
   }
+  .reaction-clear:not(:disabled):hover {
+    background: var(--reaction-wash);
+    color: var(--paper);
+  }
+  .reaction-draft-token:not(:disabled):hover,
+  .reaction-send:not(:disabled):hover {
+    border-color: var(--reaction-tone);
+    background: var(--reaction-surface);
+  }
 }
 @media (max-width: 640px) {
+  .game-table:is(.players-5, .players-6, .players-7, .players-8) .players-ring {
+    row-gap: 48px;
+  }
   .reaction-bubble {
     top: -14px;
     right: -5px;
@@ -379,44 +592,71 @@
   .reaction-bubble > span {
     font-size: 10px;
   }
+  .reaction-bubble[data-combined="true"] {
+    top: -38px;
+    right: -4px;
+    gap: 2px;
+    width: 128px;
+    max-width: none;
+    padding: 4px;
+  }
+  .reaction-bubble-part > .reaction-glyph {
+    width: 26px;
+    height: 26px;
+  }
+  .reaction-bubble > .reaction-bubble-part {
+    font-size: 10px;
+  }
 }
 :root[data-theme="light"] .reaction-area,
-:root[data-theme="light"] .reaction-bubble {
+:root[data-theme="light"] .reaction-bubble,
+:root[data-theme="light"] .reaction-draft-token,
+:root[data-theme="light"] .reaction-bubble-part {
   --reaction-tone: #405b70;
   --reaction-wash: #e8eef4;
   --reaction-rim: #9aafc1;
   --reaction-surface: #f0f4f8;
 }
 :root[data-theme="light"] .reaction-button[data-tone="blue"],
-:root[data-theme="light"] .reaction-bubble[data-tone="blue"] {
+:root[data-theme="light"] .reaction-bubble[data-tone="blue"],
+:root[data-theme="light"] .reaction-draft-token[data-tone="blue"],
+:root[data-theme="light"] .reaction-bubble-part[data-tone="blue"] {
   --reaction-tone: #285e98;
   --reaction-wash: #e3edf9;
   --reaction-rim: #87a7ca;
   --reaction-surface: #ebf2fb;
 }
 :root[data-theme="light"] .reaction-button[data-tone="red"],
-:root[data-theme="light"] .reaction-bubble[data-tone="red"] {
+:root[data-theme="light"] .reaction-bubble[data-tone="red"],
+:root[data-theme="light"] .reaction-draft-token[data-tone="red"],
+:root[data-theme="light"] .reaction-bubble-part[data-tone="red"] {
   --reaction-tone: #9b354f;
   --reaction-wash: #f7e5eb;
   --reaction-rim: #c78c9d;
   --reaction-surface: #fcf0f3;
 }
 :root[data-theme="light"] .reaction-button[data-tone="blue-deep"],
-:root[data-theme="light"] .reaction-bubble[data-tone="blue-deep"] {
+:root[data-theme="light"] .reaction-bubble[data-tone="blue-deep"],
+:root[data-theme="light"] .reaction-draft-token[data-tone="blue-deep"],
+:root[data-theme="light"] .reaction-bubble-part[data-tone="blue-deep"] {
   --reaction-tone: #203f78;
   --reaction-wash: #dce5f5;
   --reaction-rim: #7c93ba;
   --reaction-surface: #e3eaf6;
 }
 :root[data-theme="light"] .reaction-button[data-tone="red-deep"],
-:root[data-theme="light"] .reaction-bubble[data-tone="red-deep"] {
+:root[data-theme="light"] .reaction-bubble[data-tone="red-deep"],
+:root[data-theme="light"] .reaction-draft-token[data-tone="red-deep"],
+:root[data-theme="light"] .reaction-bubble-part[data-tone="red-deep"] {
   --reaction-tone: #762c4a;
   --reaction-wash: #efdee7;
   --reaction-rim: #b28099;
   --reaction-surface: #f3e6ec;
 }
 :root[data-theme="light"] .reaction-button[data-tone="amber"],
-:root[data-theme="light"] .reaction-bubble[data-tone="amber"] {
+:root[data-theme="light"] .reaction-bubble[data-tone="amber"],
+:root[data-theme="light"] .reaction-draft-token[data-tone="amber"],
+:root[data-theme="light"] .reaction-bubble-part[data-tone="amber"] {
   --reaction-tone: #80581f;
   --reaction-wash: #f4ead9;
   --reaction-rim: #b59b72;
@@ -438,9 +678,14 @@
     transition-duration: 125ms;
   }
   .reaction-area
-    :is(.reaction-button, .reaction-toggle, .reaction-panel-close):not(
-      :disabled
-    ):active {
+    :is(
+      .reaction-button,
+      .reaction-toggle,
+      .reaction-panel-close,
+      .reaction-clear,
+      .reaction-draft-token,
+      .reaction-send
+    ):not(:disabled):active {
     transform: none;
   }
   @starting-style {

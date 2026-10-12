@@ -1,6 +1,19 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, Radio, X } from "lucide-react";
-import { REACTIONS, getReaction, type ReactionId } from "../shared/reactions";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { ChevronDown, Radio, Send, X } from "lucide-react";
+import {
+  REACTIONS,
+  MAX_REACTION_PARTS,
+  getReaction,
+  getEventReactions,
+  type ReactionId,
+} from "../shared/reactions";
 import type { RoomView } from "../shared/room";
 import { ReactionGlyph } from "./ReactionGlyph";
 import "./reactions.css";
@@ -22,18 +35,38 @@ export function ReactionBubble({
   event: ReactionEvent;
   sender: string;
 }) {
-  const reaction = getReaction(event.emoji);
-  if (!reaction) return null;
+  const reactions = getEventReactions(event);
+  if (!reactions.length) return null;
+  const combined = reactions.length > 1;
   return (
     <span
       className="reaction-bubble"
-      data-tone={reaction.tone}
-      data-reaction={reaction.id}
+      data-tone={combined ? "neutral" : reactions[0].tone}
+      data-reaction={reactions.map((reaction) => reaction.id).join("+")}
+      data-combined={combined}
       role="status"
-      aria-label={`${sender} 发出表情：${reaction.label}`}
+      aria-label={`${sender} 发出信号：${reactions.map((reaction) => reaction.label).join("＋")}`}
     >
-      <ReactionGlyph id={reaction.id} />
-      <span>{reaction.label}</span>
+      {combined ? (
+        reactions.map((reaction, index) => (
+          <Fragment key={reaction.id}>
+            {index > 0 && (
+              <span className="reaction-separator" aria-hidden="true">
+                ＋
+              </span>
+            )}
+            <span className="reaction-bubble-part" data-tone={reaction.tone}>
+              <ReactionGlyph id={reaction.id} />
+              <span>{reaction.label}</span>
+            </span>
+          </Fragment>
+        ))
+      ) : (
+        <>
+          <ReactionGlyph id={reactions[0].id} />
+          <span>{reactions[0].label}</span>
+        </>
+      )}
     </span>
   );
 }
@@ -51,10 +84,14 @@ export default function ReactionPicker({
   busy: boolean;
   cooldown: boolean;
   latest?: ReactionEvent;
-  onSend: (id: ReactionId) => void;
+  onSend: (ids: ReactionId[], requestId: string) => Promise<boolean>;
 }) {
   const [open, setOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [selection, setSelection] = useState<ReactionId[]>([]);
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  const requestId = useRef<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -65,10 +102,14 @@ export default function ReactionPicker({
     maxHeight: 740,
   });
   const panelId = useId();
-  const latestReaction = latest && getReaction(latest.emoji);
+  const latestReactions = latest ? getEventReactions(latest) : [];
 
   useEffect(() => {
-    if (disabled) setOpen(false);
+    if (disabled) {
+      setOpen(false);
+      setSelection([]);
+      requestId.current = null;
+    }
   }, [disabled]);
   useLayoutEffect(() => {
     if (!open) return;
@@ -124,6 +165,43 @@ export default function ReactionPicker({
     trigger.current?.focus({ preventScroll: true });
   }
 
+  function toggle(id: ReactionId) {
+    if (disabled || sendingRef.current) return;
+    requestId.current = null;
+    setSelection((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : current.length < MAX_REACTION_PARTS
+          ? [...current, id]
+          : current,
+    );
+  }
+
+  function clear() {
+    if (sendingRef.current) return;
+    requestId.current = null;
+    setSelection([]);
+  }
+
+  async function send() {
+    if (!selection.length || disabled || busy || cooldown || sendingRef.current)
+      return;
+    sendingRef.current = true;
+    setSending(true);
+    try {
+      // Keep the same ID after a lost response so retry cannot duplicate a send.
+      requestId.current ??= crypto.randomUUID();
+      if (await onSend([...selection], requestId.current)) {
+        requestId.current = null;
+        setSelection([]);
+        close();
+      }
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
+  }
+
   return (
     <div
       className="reaction-area"
@@ -151,7 +229,7 @@ export default function ReactionPicker({
           <div className="reaction-panel-header">
             <div>
               <h3>表情与信号</h3>
-              <p>表达判断，不代表真实身份</p>
+              <p>最多组合 {MAX_REACTION_PARTS} 个 · 表达判断，不验证身份</p>
             </div>
             <button
               ref={closeButton}
@@ -183,9 +261,15 @@ export default function ReactionPicker({
                       className="reaction-button"
                       data-tone={reaction.tone}
                       data-reaction={reaction.id}
-                      aria-label={`发送表情：${reaction.label}`}
-                      disabled={disabled || cooldown || busy}
-                      onClick={() => onSend(reaction.id)}
+                      aria-label={`选择信号：${reaction.label}`}
+                      aria-pressed={selection.includes(reaction.id)}
+                      disabled={
+                        disabled ||
+                        sending ||
+                        (selection.length >= MAX_REACTION_PARTS &&
+                          !selection.includes(reaction.id))
+                      }
+                      onClick={() => toggle(reaction.id)}
                     >
                       <ReactionGlyph id={reaction.id} />
                       <span>{reaction.label}</span>
@@ -195,8 +279,69 @@ export default function ReactionPicker({
               </section>
             ))}
           </div>
-          <div className="reaction-panel-status" role="status">
-            {cooldown ? "稍等一下，每 2 秒可发送一次" : "点击即发送，全桌可见"}
+          <div className="reaction-composer">
+            <div className="reaction-draft-heading">
+              <span>
+                待发送 {selection.length}/{MAX_REACTION_PARTS}
+              </span>
+              <button
+                className="reaction-clear"
+                disabled={!selection.length || sending}
+                onClick={clear}
+              >
+                清空
+              </button>
+            </div>
+            <div
+              className="reaction-draft"
+              aria-label="组合预览"
+              aria-live="polite"
+            >
+              {selection.length ? (
+                selection.map((id, index) => {
+                  const reaction = getReaction(id)!;
+                  return (
+                    <Fragment key={id}>
+                      {index > 0 && (
+                        <span className="reaction-separator" aria-hidden="true">
+                          ＋
+                        </span>
+                      )}
+                      <button
+                        className="reaction-draft-token"
+                        data-tone={reaction.tone}
+                        aria-label={`移除信号：${reaction.label}`}
+                        disabled={sending}
+                        onClick={() => toggle(id)}
+                      >
+                        <ReactionGlyph id={id} />
+                        <span>{reaction.label}</span>
+                        <X size={10} aria-hidden="true" />
+                      </button>
+                    </Fragment>
+                  );
+                })
+              ) : (
+                <span className="reaction-draft-empty">
+                  例如：3号 ＋ 左 ＋ 好人
+                </span>
+              )}
+            </div>
+            <div className="reaction-compose-actions">
+              <span className="reaction-compose-hint" role="status">
+                {cooldown ? "稍等一下，每 2 秒发一组" : "选择后发送，全桌可见"}
+              </span>
+              <button
+                className="reaction-send"
+                disabled={
+                  !selection.length || disabled || busy || cooldown || sending
+                }
+                onClick={() => void send()}
+              >
+                <Send size={13} />
+                <span>{sending ? "发送中…" : "发送"}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -219,9 +364,9 @@ export default function ReactionPicker({
       <span className="reaction-picker-note" aria-live="polite">
         {disabled
           ? disabledReason
-          : latestReaction
-            ? `已发送「${latestReaction.label}」· 全桌可见`
-            : "编号、判断、行动，用信号交流"}
+          : latestReactions.length
+            ? `已发送「${latestReactions.map((reaction) => reaction.label).join("＋")}」· 全桌可见`
+            : "选好编号、卡位和判断，一起发送"}
       </span>
     </div>
   );

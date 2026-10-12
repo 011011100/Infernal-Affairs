@@ -7,6 +7,8 @@ type ReactionTone =
   | "red-deep"
   | "amber";
 
+export const MAX_REACTION_PARTS = 3;
+
 export const REACTIONS = [
   { id: "seat-1", label: "1号", group: "seat", tone: "neutral" },
   { id: "seat-2", label: "2号", group: "seat", tone: "neutral" },
@@ -68,4 +70,27 @@ export function isReactionId(value: unknown): value is ReactionId {
 
 export function getReaction(value: string): ReactionDefinition | undefined {
   return reactionsById.get(legacyIds.get(value) ?? value);
+}
+
+export function isReactionSelection(value: unknown): value is ReactionId[] {
+  return (
+    Array.isArray(value) &&
+    value.length >= 1 &&
+    value.length <= MAX_REACTION_PARTS &&
+    [...value].every(isReactionId) &&
+    new Set(value).size === value.length
+  );
+}
+
+export function getEventReactions(event: {
+  emoji: string;
+  reactions?: readonly string[];
+}): ReactionDefinition[] {
+  if (event.reactions !== undefined) {
+    return isReactionSelection(event.reactions)
+      ? event.reactions.map((id) => reactionsById.get(id)!)
+      : [];
+  }
+  const reaction = getReaction(event.emoji);
+  return reaction ? [reaction] : [];
 }

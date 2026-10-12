@@ -1,4 +1,5 @@
 import type { CardView, GameView } from "./types.js";
+import type { ReactionId } from "./reactions.js";
 
 export const AVATARS = [
   "🦊",
@@ -34,7 +35,13 @@ export interface RoomView {
   players: MemberView[];
   game: GameView | null;
   /** New events contain ReactionId; strings also support older saved reactions. */
-  emojis: Array<{ id: string; playerId: string; emoji: string; at: number }>;
+  emojis: Array<{
+    id: string;
+    playerId: string;
+    emoji: string;
+    reactions?: ReactionId[];
+    at: number;
+  }>;
   createdAt: number;
 }
 export interface Session {

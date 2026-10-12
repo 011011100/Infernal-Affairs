@@ -9,7 +9,14 @@ import test, { type TestContext } from "node:test";
 import WebSocket from "ws";
 import { createApp } from "../server/app.js";
 import type { RoomView } from "../shared/room.js";
-import { REACTIONS, getReaction, isReactionId } from "../shared/reactions.js";
+import {
+  MAX_REACTION_PARTS,
+  REACTIONS,
+  getEventReactions,
+  getReaction,
+  isReactionId,
+  isReactionSelection,
+} from "../shared/reactions.js";
 import { createEquipmentDeck } from "../shared/equipment.js";
 import type { GameLog } from "../shared/types.js";
 
@@ -744,6 +751,162 @@ test("reaction catalog resolves current IDs and legacy display values without ac
   }
 });
 
+test("reaction selections preserve order and invalid saved combinations never display a partial fallback", () => {
+  assert.equal(MAX_REACTION_PARTS, 3);
+  for (const selection of [
+    ["good"],
+    ["card-left", "seat-3"],
+    ["seat-3", "card-left", "good"],
+  ]) {
+    const frozen = Object.freeze([...selection]);
+    assert.equal(isReactionSelection(frozen), true);
+    assert.deepEqual(
+      getEventReactions({ emoji: "laugh", reactions: frozen }).map(
+        (part) => part.id,
+      ),
+      selection,
+      "the complete ordered selection takes precedence over the legacy field",
+    );
+  }
+  assert.deepEqual(
+    getEventReactions({ emoji: "👍" }).map((part) => part.id),
+    ["agree"],
+  );
+  assert.deepEqual(
+    getEventReactions({ emoji: "doubt" }).map((part) => part.id),
+    ["doubt"],
+  );
+  assert.deepEqual(getEventReactions({ emoji: "unknown" }), []);
+  for (const selection of [
+    [],
+    ["seat-3", "card-left", "good", "lock"],
+    ["good", "good"],
+    ["good", "unknown"],
+    ["👍"],
+    new Array(1),
+    null,
+    "good",
+    { 0: "good", length: 1 },
+  ]) {
+    assert.equal(isReactionSelection(selection), false);
+    assert.deepEqual(
+      getEventReactions({ emoji: "good", reactions: selection as string[] }),
+      [],
+      "a malformed new selection must not fall back to one apparently valid claim",
+    );
+  }
+});
+
+test("a combination is one private-safe HTTP/WebSocket event with one cooldown and idempotent retries", async (t) => {
+  const f = await fixture(t);
+  const sessions = await f.startGame();
+  const actor = sessions[0];
+  const initial = structuredClone(f.service.get(actor.room.code));
+  const reactions = ["seat-3", "card-left", "good"];
+  const requestId = randomUUID();
+  const response = await f.request(
+    actor,
+    { type: "emoji", reactions },
+    -1,
+    requestId,
+  );
+  assert.equal(response.statusCode, 200);
+  const after = response.json<{ room: RoomView }>().room;
+  assert.equal(after.revision, initial.revision + 1);
+  assert.equal(after.emojis.length, 1);
+  const event = after.emojis[0];
+  assert.equal(event.playerId, actor.playerId);
+  assert.equal(event.emoji, "seat-3");
+  assert.deepEqual(event.reactions, reactions);
+  assert.deepEqual(Object.keys(event).sort(), [
+    "at",
+    "emoji",
+    "id",
+    "playerId",
+    "reactions",
+  ]);
+  const committed = structuredClone(f.service.get(actor.room.code));
+  assert.equal(committed.requests.length, initial.requests.length + 1);
+  assert.deepEqual(committed.game, initial.game);
+
+  for (const [index, session] of sessions.entries()) {
+    await eventually(
+      () =>
+        f.peers[index].messages.some(
+          (message) => message.room?.revision === after.revision,
+        ),
+      "one complete combination delivered by websocket",
+    );
+    const websocket = f.peers[index].messages.findLast(
+      (message) => message.room?.revision === after.revision,
+    )!.room!;
+    for (const room of [await f.view(session), websocket]) {
+      assert.deepEqual(room.emojis, [event]);
+      assertPrivateProjection(room, session, sessions, f);
+    }
+  }
+
+  t.mock.timers.enable({ apis: ["Date"], now: event.at });
+  t.mock.timers.tick(1999);
+  assert.equal(
+    (await f.request(actor, { type: "emoji", reactions: ["lock"] })).statusCode,
+    429,
+  );
+  assert.deepEqual(f.service.get(actor.room.code), committed);
+  const retry = await f.request(
+    actor,
+    { type: "emoji", reactions },
+    -1,
+    requestId,
+  );
+  assert.equal(retry.statusCode, 200);
+  assert.deepEqual(retry.json<{ room: RoomView }>().room, after);
+  assert.deepEqual(f.service.get(actor.room.code), committed);
+
+  t.mock.timers.tick(1);
+  const next = await f.action(actor, { type: "emoji", reactions: ["lock"] });
+  assert.equal(next.revision, after.revision + 1);
+  assert.equal(next.emojis.length, 2);
+  assert.deepEqual(next.emojis[1].reactions, ["lock"]);
+  assert.equal(next.emojis[1].at - event.at, 2000);
+  assert.deepEqual(f.service.get(actor.room.code).game, initial.game);
+});
+
+test("malformed combinations reject atomically even with a valid legacy fallback", async (t) => {
+  const f = await fixture(t);
+  const host = await f.create();
+  const before = structuredClone(f.service.get(host.room.code));
+  for (const reactions of [
+    [],
+    ["seat-3", "card-left", "good", "lock"],
+    ["good", "good"],
+    ["good", "unknown"],
+    ["good", "👍"],
+    ["good", null],
+    null,
+    "good",
+    3,
+    {},
+  ]) {
+    const response = await f.request(host, {
+      type: "emoji",
+      emoji: "good",
+      reactions,
+    });
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(f.service.get(host.room.code), before);
+  }
+  const valid = await f.action(host, {
+    type: "emoji",
+    reactions: ["good", "card-left"],
+  });
+  assert.equal(
+    valid.emojis.length,
+    1,
+    "rejections never consume the send cooldown",
+  );
+});
+
 test("seat, role, action and interaction reactions broadcast over HTTP and authenticated WebSockets", async (t) => {
   const f = await fixture(t);
   const sessions = await f.startGame();
@@ -942,11 +1105,12 @@ test("SQLite restart preserves game, private identity, revision and idempotency 
   const sessions = await first.startGame();
   const session = sessions[2];
   const requestId = randomUUID();
+  const reactions = ["seat-3", "card-left", "good"];
   assert.equal(
     (
       await first.request(
         session,
-        { type: "emoji", emoji: "doubt" },
+        { type: "emoji", reactions },
         undefined,
         requestId,
       )
@@ -968,9 +1132,11 @@ test("SQLite restart preserves game, private identity, revision and idempotency 
     true,
   );
   assert.deepEqual(restored.game, before.game);
+  assert.deepEqual(restored.emojis, before.emojis);
+  assert.deepEqual(restored.emojis[0].reactions, reactions);
   const duplicate = await second.request(
     session,
-    { type: "emoji", emoji: "doubt" },
+    { type: "emoji", reactions },
     -1,
     requestId,
   );

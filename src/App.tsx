@@ -1113,7 +1113,7 @@ function Game({
   syncEpoch: number;
   meId: string;
   busy: boolean;
-  onAction: (action: Action) => void;
+  onAction: (action: Action) => Promise<boolean>;
   toast: (message: string) => void;
 }) {
   const game = room.game!;
@@ -1239,18 +1239,26 @@ function Game({
   const closeEquipment = useCallback(() => setEquipment(null), []);
   const recentReaction = (playerId: string) =>
     room.emojis
-      .filter((e) => e.playerId === playerId && now - e.at < 4000)
+      .filter(
+        (e) =>
+          e.playerId === playerId &&
+          now - e.at < ((e.reactions?.length ?? 1) > 1 ? 6500 : 4000),
+      )
       .at(-1);
-  const sendReaction = (id: ReactionId) => {
+  const sendReaction = async (
+    ids: ReactionId[],
+    requestId: string,
+  ): Promise<boolean> => {
     if (
       busy ||
       !me.alive ||
       room.status !== "playing" ||
       Date.now() < reactionCooldownUntil
     )
-      return;
-    onAction({ type: "emoji", emoji: id });
-    setReactionCooldownUntil(Date.now() + 2100);
+      return false;
+    const sent = await onAction({ type: "emoji", reactions: ids, requestId });
+    if (sent) setReactionCooldownUntil(Date.now() + 2100);
+    return sent;
   };
   function submitMode() {
     if (!mode) return;
@@ -2275,8 +2283,8 @@ export default function App() {
       setBusy(false);
     }
   }
-  async function action(payload: Action) {
-    if (!session || !roomRef.current || busy) return;
+  async function action(payload: Action): Promise<boolean> {
+    if (!session || !roomRef.current || busy) return false;
     setBusy(true);
     try {
       const response = await fetch(
@@ -2289,7 +2297,7 @@ export default function App() {
           },
           body: JSON.stringify({
             ...payload,
-            requestId: crypto.randomUUID(),
+            requestId: payload.requestId ?? crypto.randomUUID(),
             expectedRevision: roomRef.current.revision,
           }),
         },
@@ -2307,8 +2315,10 @@ export default function App() {
         }
       }
       if (!response.ok) throw new Error(data.error || "行动未完成");
+      return true;
     } catch (error) {
       toast(error instanceof Error ? error.message : "连接中断，请重试");
+      return false;
     } finally {
       setBusy(false);
     }
