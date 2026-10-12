@@ -23,6 +23,7 @@ import {
   DoorOpen,
   Eye,
   Fingerprint,
+  FlaskConical,
   Flag,
   HeartCrack,
   Info,
@@ -50,6 +51,7 @@ import type { RoomView } from "../shared/room";
 import { AVATARS } from "../shared/room";
 import type { ReactionId } from "../shared/reactions";
 import ReactionPicker, { ReactionBubble } from "./ReactionPicker";
+import PracticeControls from "./PracticeControls";
 import {
   investigationBaseline,
   isInvestigationCueActive,
@@ -64,7 +66,10 @@ const GunTable = lazy(() =>
 type Player = RoomView["players"][number];
 type Connection = "connecting" | "connected" | "reconnecting" | "offline";
 type Action = Record<string, unknown> & { type: string };
-const SESSION_KEY = "wujian-session-v1";
+const IS_PRACTICE_ENTRY = /^\/test\/?$/.test(window.location.pathname);
+const SESSION_KEY = IS_PRACTICE_ENTRY
+  ? "wujian-test-session-v1"
+  : "wujian-session-v1";
 const IDENTITY: Record<
   string,
   { name: string; en: string; className: string; description: string }
@@ -300,10 +305,12 @@ function Home({
   onResume?: () => void;
 }) {
   const [mode, setMode] = useState<"create" | "join">(
-    inviteCode() ? "join" : "create",
+    !IS_PRACTICE_ENTRY && inviteCode() ? "join" : "create",
   );
   const [name, setName] = useState(
-    () => localStorage.getItem("wujian-name") || "",
+    () =>
+      localStorage.getItem("wujian-name") ||
+      (IS_PRACTICE_ENTRY ? "测试玩家1" : ""),
   );
   const [avatar, setAvatar] = useState(
     () => localStorage.getItem("wujian-avatar") || AVATARS[0],
@@ -321,6 +328,11 @@ function Home({
         <Brand />
         <div className="home-header-actions">
           <ThemeToggle />
+          {IS_PRACTICE_ENTRY && (
+            <a className="text-button" href="/">
+              返回好友房间
+            </a>
+          )}
           <button className="text-button" onClick={onRules}>
             <BookOpen size={17} /> 行动手册 <ArrowRight size={16} />
           </button>
@@ -329,17 +341,32 @@ function Home({
       <main className="home-main">
         <section className="hero">
           <div className="eyebrow hero-eyebrow">
-            <span className="status-dot" /> ONLINE SOCIAL DEDUCTION
+            <span className="status-dot" />{" "}
+            {IS_PRACTICE_ENTRY
+              ? "SINGLE PLAYER TEST"
+              : "ONLINE SOCIAL DEDUCTION"}
           </div>
           <h1>
-            每个人，
+            {IS_PRACTICE_ENTRY ? "一个人，" : "每个人，"}
             <br />
-            都有<span>另一面。</span>
+            {IS_PRACTICE_ENTRY ? (
+              <>
+                也能<span>开局。</span>
+              </>
+            ) : (
+              <>
+                都有<span>另一面。</span>
+              </>
+            )}
           </h1>
           <p className="hero-description">
-            警徽之下，暗流涌动。
+            {IS_PRACTICE_ENTRY
+              ? "自动补齐座位，自由切换视角。"
+              : "警徽之下，暗流涌动。"}
             <br />
-            在一张牌桌上，找到值得你相信的人。
+            {IS_PRACTICE_ENTRY
+              ? "亲手试一遍调查、拿枪和表情交锋。"
+              : "在一张牌桌上，找到值得你相信的人。"}
           </p>
           <div className="hero-facts">
             <span>
@@ -389,31 +416,41 @@ function Home({
             <span className="eyebrow">YOUR NEXT MOVE</span>
             <span className="file-tag">档案 № 001</span>
           </div>
-          <h2>今晚，谁是自己人？</h2>
+          <h2>{IS_PRACTICE_ENTRY ? "单人测试牌桌" : "今晚，谁是自己人？"}</h2>
           {onResume && (
             <button className="text-button resume-button" onClick={onResume}>
               <RotateCcw size={14} /> 回到之前的牌桌
             </button>
           )}
-          <p className="entry-subtitle">叫上朋友，一起进入这场信任博弈。</p>
-          <div className="entry-tabs" role="tablist" aria-label="进入游戏方式">
-            <button
-              role="tab"
-              aria-selected={mode === "create"}
-              className={mode === "create" ? "active" : ""}
-              onClick={() => setMode("create")}
+          <p className="entry-subtitle">
+            {IS_PRACTICE_ENTRY
+              ? "无需等待其他人，创建后直接开始。"
+              : "叫上朋友，一起进入这场信任博弈。"}
+          </p>
+          {!IS_PRACTICE_ENTRY && (
+            <div
+              className="entry-tabs"
+              role="tablist"
+              aria-label="进入游戏方式"
             >
-              创建房间
-            </button>
-            <button
-              role="tab"
-              aria-selected={mode === "join"}
-              className={mode === "join" ? "active" : ""}
-              onClick={() => setMode("join")}
-            >
-              加入房间
-            </button>
-          </div>
+              <button
+                role="tab"
+                aria-selected={mode === "create"}
+                className={mode === "create" ? "active" : ""}
+                onClick={() => setMode("create")}
+              >
+                创建房间
+              </button>
+              <button
+                role="tab"
+                aria-selected={mode === "join"}
+                className={mode === "join" ? "active" : ""}
+                onClick={() => setMode("join")}
+              >
+                加入房间
+              </button>
+            </div>
+          )}
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -474,7 +511,12 @@ function Home({
             {mode === "create" ? (
               <>
                 <label className="field-label">
-                  房间人数上限 <span>至少 4 人即可开始</span>
+                  {IS_PRACTICE_ENTRY ? "测试座位数" : "房间人数上限"}{" "}
+                  <span>
+                    {IS_PRACTICE_ENTRY
+                      ? "其余座位自动补齐"
+                      : "至少 4 人即可开始"}
+                  </span>
                 </label>
                 <div className="capacity-selector">
                   {[4, 5, 6, 7, 8].map((number) => (
@@ -492,7 +534,11 @@ function Home({
                 </div>
                 <div className="entry-note">
                   <LockKeyhole size={15} />
-                  <span>创建后分享房间码，持房间码或链接即可加入。</span>
+                  <span>
+                    {IS_PRACTICE_ENTRY
+                      ? "这是你的独立测试桌，可控制任意座位，也可让其他玩家自动行动。"
+                      : "创建后分享房间码，持房间码或链接即可加入。"}
+                  </span>
                 </div>
               </>
             ) : (
@@ -534,14 +580,23 @@ function Home({
                 </>
               ) : (
                 <>
-                  {mode === "create"
-                    ? "创建房间，邀请好友"
-                    : "加入房间，立即入座"}
+                  {IS_PRACTICE_ENTRY
+                    ? "开始单人测试"
+                    : mode === "create"
+                      ? "创建房间，邀请好友"
+                      : "加入房间，立即入座"}
                   <ArrowRight size={18} />
                 </>
               )}
             </button>
           </form>
+          {!IS_PRACTICE_ENTRY && (
+            <a className="practice-entry-link" href="/test">
+              <FlaskConical size={16} />
+              <span>只有一个人？进入单人测试</span>
+              <ArrowRight size={15} />
+            </a>
+          )}
           <div className="entry-bottom">
             <span>无需注册</span>
             <span>即时开局</span>
@@ -578,15 +633,24 @@ function TableHeader({
     <header className="table-header">
       <Brand small />
       <div className="room-header-info">
-        <span className="room-code-label">房间</span>
-        <button
-          className="room-code-button"
-          onClick={onShare}
-          title="复制邀请链接"
-        >
-          {room.code}
-          <Copy size={13} />
-        </button>
+        {room.practice ? (
+          <span className="practice-header-badge">
+            <FlaskConical size={14} />
+            单人测试
+          </span>
+        ) : (
+          <>
+            <span className="room-code-label">房间</span>
+            <button
+              className="room-code-button"
+              onClick={onShare}
+              title="复制邀请链接"
+            >
+              {room.code}
+              <Copy size={13} />
+            </button>
+          </>
+        )}
         <span
           className={`connection-state ${connection}`}
           title={
@@ -616,7 +680,10 @@ function TableHeader({
         <IconButton label="行动手册" onClick={onRules}>
           <BookOpen size={19} />
         </IconButton>
-        <IconButton label="离开房间" onClick={onLeave}>
+        <IconButton
+          label={room.practice ? "退出测试" : "离开房间"}
+          onClick={onLeave}
+        >
           <LogOut size={19} />
         </IconButton>
       </div>
@@ -1367,6 +1434,7 @@ function Game({
             <b>{String(game.turn).padStart(2, "0")}</b>
           </div>
         </div>
+        <PracticeControls room={room} busy={busy} onAction={onAction} />
         {latestInvestigation && (
           <section
             className={`investigation-notice ${activeInvestigations.length ? "is-recent" : ""}`}
@@ -1650,10 +1718,14 @@ function Game({
               >
                 查看对局结果 <Flag size={16} />
               </button>
-              {room.hostId === meId && (
+              {(room.practice || room.hostId === meId) && (
                 <button
                   className="button outline full-width rematch-button"
-                  onClick={() => onAction({ type: "rematch" })}
+                  onClick={() =>
+                    onAction({
+                      type: room.practice ? "practiceReset" : "rematch",
+                    })
+                  }
                   disabled={busy}
                 >
                   <RotateCcw size={16} /> 再来一局
@@ -2077,12 +2149,12 @@ function Game({
               </div>
             ))}
           </div>
-          {room.hostId === meId ? (
+          {room.practice || room.hostId === meId ? (
             <button
               className="button primary full-width"
               onClick={() => {
                 setShowResult(false);
-                onAction({ type: "rematch" });
+                onAction({ type: room.practice ? "practiceReset" : "rematch" });
               }}
               disabled={busy}
             >
@@ -2259,7 +2331,11 @@ export default function App() {
     setBusy(true);
     try {
       const response = await fetch(
-        code ? `/api/rooms/${encodeURIComponent(code)}/join` : "/api/rooms",
+        IS_PRACTICE_ENTRY
+          ? "/api/practice"
+          : code
+            ? `/api/rooms/${encodeURIComponent(code)}/join`
+            : "/api/rooms",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2325,7 +2401,7 @@ export default function App() {
   }
   async function leave() {
     if (!session) return;
-    if (room?.status === "playing") {
+    if (room?.status === "playing" && !room.practice) {
       setSession(null);
       setRoom(null);
       setLeaving(false);
@@ -2415,7 +2491,9 @@ export default function App() {
             room={room}
             connection={connection}
             onRules={() => setRules(true)}
-            onLeave={() => setLeaving(true)}
+            onLeave={
+              room.practice ? () => void leave() : () => setLeaving(true)
+            }
             onShare={share}
           />
           {connection !== "connected" && (
@@ -2434,9 +2512,14 @@ export default function App() {
             />
           ) : (
             <Game
+              key={
+                room.practice
+                  ? `${room.code}:${room.practice.gameId}:${room.game?.me.id}:${syncEpoch}`
+                  : room.code
+              }
               room={room}
               syncEpoch={syncEpoch}
-              meId={session.playerId}
+              meId={room.practice ? room.game!.me.id : session.playerId}
               busy={busy || connection !== "connected"}
               onAction={action}
               toast={toast}

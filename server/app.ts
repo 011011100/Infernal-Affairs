@@ -72,6 +72,11 @@ export async function createApp(
     { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request) => service.create(request.body),
   );
+  app.post(
+    "/api/practice",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request) => service.createPractice(request.body),
+  );
   app.post<{ Params: { code: string } }>(
     "/api/rooms/:code/join",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },

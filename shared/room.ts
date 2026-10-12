@@ -27,6 +27,7 @@ export interface MemberView {
 }
 export interface RoomView {
   waitingPlayerId?: string;
+  practice?: { gameId: string; activePlayerId: string; autoplay: boolean };
   code: string;
   hostId: string;
   capacity: number;
