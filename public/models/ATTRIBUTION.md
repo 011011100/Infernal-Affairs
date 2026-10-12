@@ -31,6 +31,11 @@ The adapted model contains **4,299 triangles**, **11 materials**, and 11 static
 meshes. Its dimensions are approximately **1 × 0.558279 × 0.149289** units
 (length × height × width). No animation clips are included.
 
+The game additionally adjusts metalness and roughness for its metal and grip
+surfaces at render time, adds a shared studio lighting environment and soft
+contact shadows, and uses a slightly angled overhead view for held weapons.
+These display changes retain the supplied mesh and base colors.
+
 ## Reproduce
 
 After installing the project's dependencies, run from the repository root:

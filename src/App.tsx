@@ -912,6 +912,7 @@ function PlayerSeat({
     <div
       className={`player-seat ${player.id === currentId ? "current-seat" : ""} ${player.id === myId ? "my-seat" : ""} ${!player.alive ? "eliminated-seat" : ""} ${player.alive && player.wounded ? "wounded-seat" : ""} ${selectable ? "targetable-seat" : ""} ${selected ? "selected-seat" : ""} ${shotTarget === player.id ? "under-fire" : ""} ${investigations.some((event) => event.targetId === player.id) ? "inspected-seat" : ""}`}
       data-player-id={player.id}
+      data-table-half={index < Math.ceil(players.length / 2) ? "top" : "bottom"}
       onClick={selectable ? onClick : undefined}
       role={selectable ? "button" : undefined}
       tabIndex={selectable ? 0 : undefined}

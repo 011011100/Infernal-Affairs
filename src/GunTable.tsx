@@ -1,12 +1,17 @@
-import { useEffect, useId, useRef, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import {
   ACESFilmicToneMapping,
   Box3,
+  CanvasTexture,
   DirectionalLight,
   Group,
   HemisphereLight,
   Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
   OrthographicCamera,
+  PlaneGeometry,
+  PMREMGenerator,
   Quaternion,
   Scene,
   SRGBColorSpace,
@@ -16,8 +21,10 @@ import {
   type BufferGeometry,
   type Material,
   type Object3D,
+  type WebGLRenderTarget,
 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { reconcileGunSlots, type GunPlayer, type GunSlot } from "./gunState";
 import "./gun-table.css";
 
@@ -35,24 +42,30 @@ type Pose = { position: Vector3; rotation: Quaternion; scale: number };
 type GunVisual = {
   slot: GunSlot;
   model: Object3D;
+  shadow: Mesh<PlaneGeometry, MeshBasicMaterial>;
   marker: HTMLSpanElement;
-  line: SVGLineElement;
-  dot: SVGCircleElement;
   from: Pose;
   to: Pose;
   startedAt: number;
   moving: boolean;
-  endpoint: Point | null;
 };
 type Runtime = { update: (props: GunTableProps) => void; dispose: () => void };
 
 const MOVE_MS = 500;
-const SVG_NS = "http://www.w3.org/2000/svg";
 const Z_AXIS = new Vector3(0, 0, 1);
 const TOP_VIEW = new Quaternion().setFromAxisAngle(
   new Vector3(1, 0, 0),
-  Math.PI / 2,
+  (68 * Math.PI) / 180,
 );
+const SIDE_VIEW = new Quaternion().setFromAxisAngle(
+  new Vector3(0, 1, 0),
+  (-12 * Math.PI) / 180,
+);
+// Measured from this normalized GLB's muzzle. Tilting the model makes the
+// barrel's height visible, so aim its axis rather than the bounding-box center.
+const BARREL_OFFSET = new Vector3(0, 0.21669, -0.000096).applyQuaternion(
+  TOP_VIEW,
+).y;
 
 function snapshotKey(props: GunTableProps) {
   return JSON.stringify([
@@ -93,11 +106,15 @@ function movementEasing(table: HTMLElement): (progress: number) => number {
   };
 }
 
-function disposeAsset(root: Object3D) {
-  const geometries = new Set<BufferGeometry>();
-  const materials = new Set<Material>();
+function disposeAsset(
+  root: Object3D | null,
+  extraGeometries: readonly BufferGeometry[] = [],
+  extraMaterials: readonly Material[] = [],
+) {
+  const geometries = new Set<BufferGeometry>(extraGeometries);
+  const materials = new Set<Material>(extraMaterials);
   const textures = new Set<Texture>();
-  root.traverse((object) => {
+  root?.traverse((object) => {
     if (!(object instanceof Mesh)) return;
     geometries.add(object.geometry);
     const list = Array.isArray(object.material)
@@ -105,11 +122,13 @@ function disposeAsset(root: Object3D) {
       : [object.material];
     for (const material of list) {
       materials.add(material);
-      for (const value of Object.values(material)) {
-        if (value instanceof Texture) textures.add(value);
-      }
     }
   });
+  for (const material of materials) {
+    for (const value of Object.values(material)) {
+      if (value instanceof Texture) textures.add(value);
+    }
+  }
   for (const geometry of geometries) geometry.dispose();
   for (const material of materials) material.dispose();
   for (const texture of textures) {
@@ -121,47 +140,68 @@ function disposeAsset(root: Object3D) {
   }
 }
 
-function svgElement<K extends keyof SVGElementTagNameMap>(
-  name: K,
-  attributes: Record<string, string | number> = {},
-): SVGElementTagNameMap[K] {
-  const element = document.createElementNS(SVG_NS, name);
-  for (const [key, value] of Object.entries(attributes)) {
-    element.setAttribute(key, String(value));
-  }
-  return element;
+function tuneGunMaterials(root: Object3D) {
+  // The normalized asset's upper slide meshes are .004/.005/.010; its
+  // rear/lower grip meshes are material_0/.006. Mixed frame .003 stays satin.
+  // Preserve every original color and keep the red sight (.009) nonmetallic.
+  const finishes: Record<string, readonly [number, number]> = {
+    "Material.004": [0.5, 0.4],
+    "Material.005": [0.5, 0.4],
+    "Material.010": [0.5, 0.42],
+    "Material.003": [0.32, 0.52],
+    "Material.008": [0.4, 0.46],
+    Material: [0.48, 0.42],
+    "Material.001": [0.48, 0.42],
+    "Material.002": [0.48, 0.42],
+    material_0: [0.04, 0.84],
+    "Material.006": [0.08, 0.8],
+    "Material.009": [0, 0.78],
+  };
+  const visited = new Set<Material>();
+  root.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+    for (const material of materials) {
+      if (!(material instanceof MeshStandardMaterial) || visited.has(material))
+        continue;
+      visited.add(material);
+      const finish = finishes[material.name];
+      if (!finish) continue;
+      [material.metalness, material.roughness] = finish;
+    }
+  });
 }
 
-function outsideSeat(target: Point, from: Point, seat: Rect): Point {
-  const dx = from.x - target.x;
-  const dy = from.y - target.y;
-  const padding = 6;
-  const x =
-    Math.abs(dx) < 0.001
-      ? Infinity
-      : ((dx > 0 ? seat.x + seat.width + padding : seat.x - padding) -
-          target.x) /
-        dx;
-  const y =
-    Math.abs(dy) < 0.001
-      ? Infinity
-      : ((dy > 0 ? seat.y + seat.height + padding : seat.y - padding) -
-          target.y) /
-        dy;
-  const distance = Math.min(x, y, 1);
-  return {
-    x: target.x + dx * distance,
-    y: target.y + dy * distance,
-  };
+function createShadowMaterial() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext("2d");
+  if (context) {
+    const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 62);
+    gradient.addColorStop(0, "rgba(0, 0, 0, 0.55)");
+    gradient.addColorStop(0.25, "rgba(0, 0, 0, 0.35)");
+    gradient.addColorStop(0.65, "rgba(0, 0, 0, 0.1)");
+    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 128, 128);
+  }
+  return new MeshBasicMaterial({
+    map: new CanvasTexture(canvas),
+    color: 0x000000,
+    transparent: true,
+    depthWrite: false,
+    toneMapped: false,
+  });
 }
 
 function createRuntime(
   initialProps: GunTableProps,
   layer: HTMLDivElement,
   canvas: HTMLCanvasElement,
-  svg: SVGSVGElement,
   markers: HTMLDivElement,
-  maskId: string,
 ): Runtime {
   const table = initialProps.tableRef.current!;
   const scene = new Scene();
@@ -169,14 +209,17 @@ function createRuntime(
   scene.add(gunGroup);
   const camera = new OrthographicCamera(0, 1, 0, -1, 0.1, 2000);
   camera.position.z = 1000;
-  const sky = new HemisphereLight(0xe5efff, 0x354053, 3);
+  const sky = new HemisphereLight(0xe5efff, 0x354053, 0.5);
   const key = new DirectionalLight(0xffffff, 3);
-  key.position.set(-200, 300, 700);
-  const rim = new DirectionalLight(0x9acaff, 2);
-  rim.position.set(400, -300, 450);
+  key.position.set(-350, 400, 380);
+  const rim = new DirectionalLight(0xc4daed, 0.8);
+  rim.position.set(320, -170, 260);
   scene.add(sky, key, rim);
+  const shadowGeometry = new PlaneGeometry(1, 1);
+  const shadowMaterial = createShadowMaterial();
 
   let renderer: WebGLRenderer | null = null;
+  let environment: WebGLRenderTarget | null = null;
   let source: Object3D | null = null;
   let disposed = false;
   let failed = false;
@@ -191,24 +234,14 @@ function createRuntime(
   let snapNext = true;
   let inViewport = true;
   let modelHeight = 0.4;
+  let modelDepth = 0.15;
   const visuals = new Map<string, GunVisual>();
   const observed = new Set<Element>();
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const ease = movementEasing(table);
   const currentDirection = new Vector3();
-  const definitions = svgElement("defs");
-  const mask = svgElement("mask", {
-    id: maskId,
-    maskUnits: "userSpaceOnUse",
-    x: 0,
-    y: 0,
-  });
-  const maskBackground = svgElement("rect", { fill: "white" });
-  const exclusions = svgElement("g", { fill: "black" });
-  mask.append(maskBackground, exclusions);
-  definitions.append(mask);
-  const lines = svgElement("g", { mask: `url(#${maskId})` });
-  svg.append(definitions, lines);
+  const currentUp = new Vector3();
+  const currentSide = new Vector3();
 
   function cancelFrame() {
     if (frame) window.cancelAnimationFrame(frame);
@@ -245,11 +278,13 @@ function createRuntime(
     layer.dataset.theme = props.theme;
     sky.color.setHex(dark ? 0xe3ecff : 0xffffff);
     sky.groundColor.setHex(dark ? 0x53637c : 0x8d98aa);
-    sky.intensity = dark ? 3.6 : 2.7;
-    key.intensity = dark ? 6 : 2.8;
-    rim.color.setHex(dark ? 0xadcfff : 0xcadfff);
-    rim.intensity = dark ? 4 : 1.6;
-    if (renderer) renderer.toneMappingExposure = dark ? 1.65 : 1.05;
+    sky.intensity = dark ? 0.5 : 0.35;
+    key.intensity = dark ? 2.7 : 2.8;
+    rim.color.setHex(dark ? 0xc4daed : 0xe1e9f0);
+    rim.intensity = dark ? 1 : 0.75;
+    scene.environmentIntensity = dark ? 0.65 : 0.7;
+    shadowMaterial.opacity = dark ? 0.55 : 0.48;
+    if (renderer) renderer.toneMappingExposure = 1.05;
   }
 
   function currentPose(visual: GunVisual): Pose {
@@ -266,26 +301,22 @@ function createRuntime(
     model.quaternion.copy(pose.rotation);
     model.scale.setScalar(pose.scale);
     gunGroup.add(model);
+    const shadow = new Mesh(shadowGeometry, shadowMaterial);
+    // A shared soft footprint adds grounding without another render pass.
+    shadow.renderOrder = -1;
+    gunGroup.add(shadow);
     const marker = document.createElement("span");
     marker.dataset.gunSlot = slot.id;
     markers.append(marker);
-    const line = svgElement("line", { class: "gun-table-aim-line" });
-    const dot = svgElement("circle", {
-      class: "gun-table-aim-dot",
-      r: 2.2,
-    });
-    lines.append(line, dot);
     return {
       slot,
       model,
+      shadow,
       marker,
-      line,
-      dot,
       from: pose,
       to: pose,
       startedAt: 0,
       moving: false,
-      endpoint: null,
     };
   }
 
@@ -303,11 +334,6 @@ function createRuntime(
       camera.right = width;
       camera.bottom = -height;
       camera.updateProjectionMatrix();
-      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-      mask.setAttribute("width", String(width));
-      mask.setAttribute("height", String(height));
-      maskBackground.setAttribute("width", String(width));
-      maskBackground.setAttribute("height", String(height));
     }
     const localRect = (element: Element): Rect => {
       const rect = element.getBoundingClientRect();
@@ -335,29 +361,12 @@ function createRuntime(
     }
     const anchors = new Set<Element>([table]);
     if (rackElement) anchors.add(rackElement);
-    exclusions.replaceChildren();
     for (const seat of seatElements.values()) {
       anchors.add(seat);
       const dock = seat.querySelector<HTMLElement>("[data-gun-dock]");
       const name = seat.querySelector<HTMLElement>(".player-name-row");
       if (dock) anchors.add(dock);
       if (name) anchors.add(name);
-      const rect = localRect(seat);
-      exclusions.append(
-        svgElement("rect", {
-          x: rect.x - 3,
-          y: rect.y - 3,
-          width: rect.width + 6,
-          height: rect.height + 6,
-          rx: 6,
-        }),
-      );
-    }
-    for (const label of table.querySelectorAll<HTMLElement>(
-      ".gun-supply, .shot-countdown",
-    )) {
-      const rect = localRect(label);
-      exclusions.append(svgElement("rect", { ...rect, rx: 4 }));
     }
     const publicSlots = slots.filter((slot) => !slot.ownerId);
     const publicCount = Math.max(1, publicSlots.length);
@@ -367,15 +376,36 @@ function createRuntime(
       (rack.width - rackGap * (publicCount - 1)) / publicCount;
     const rowHeight = rack.height / publicCount;
     const rackScale = horizontalRack
-      ? Math.min(columnWidth, (rack.height * 0.94) / modelHeight, 122)
-      : Math.min(rack.width * 0.9, (rowHeight * 0.86) / modelHeight, 122);
+      ? Math.min(columnWidth, (rack.height * 0.94) / modelHeight, 144)
+      : Math.min(rack.width * 0.9, (rowHeight * 0.86) / modelHeight, 144);
+    // Once players hold guns, keep the remaining supply in the horizontal
+    // gaps between seats. Re-centering a single gun directly below a middle
+    // holder otherwise puts two weapons on top of each other.
+    const columnCenters = [...seatElements.values()]
+      .map((seat) => center(localRect(seat)).x)
+      .sort((a, b) => a - b)
+      .filter((x, index, all) => index === 0 || x - all[index - 1] > 2);
+    const gaps = columnCenters
+      .slice(1)
+      .map((x, index) => (x + columnCenters[index]) / 2);
+    const supplyColumns =
+      horizontalRack &&
+      slots.some((slot) => slot.ownerId) &&
+      gaps.length >= publicCount
+        ? gaps
+            .sort(
+              (a, b) => Math.abs(a - rackCenter.x) - Math.abs(b - rackCenter.x),
+            )
+            .slice(0, publicCount)
+            .sort((a, b) => a - b)
+        : null;
+    const heldScale = window.matchMedia("(max-width: 640px)").matches ? 78 : 96;
     const present = new Set(slots.map((slot) => slot.id));
     for (const [id, visual] of visuals) {
       if (present.has(id)) continue;
       gunGroup.remove(visual.model);
+      gunGroup.remove(visual.shadow);
       visual.marker.remove();
-      visual.line.remove();
-      visual.dot.remove();
       visuals.delete(id);
     }
     for (const slot of slots) {
@@ -391,7 +421,8 @@ function createRuntime(
         ? center(dockRect)
         : {
             x: horizontalRack
-              ? rack.x + columnWidth / 2 + (columnWidth + rackGap) * row
+              ? (supplyColumns?.[row] ??
+                rack.x + columnWidth / 2 + (columnWidth + rackGap) * row)
               : rackCenter.x,
             y: horizontalRack ? rackCenter.y : rack.y + rowHeight * (row + 0.5),
           };
@@ -401,23 +432,29 @@ function createRuntime(
       const targetCenter = target
         ? center(localRect(targetName || target))
         : rackCenter;
+      const scale = dockRect
+        ? Math.min(heldScale, dockRect.width * 0.92)
+        : rackScale;
+      const deltaX = targetCenter.x - position.x;
+      const deltaY = -(targetCenter.y - position.y);
+      const barrelCorrection = Math.asin(
+        Math.min(
+          1,
+          (BARREL_OFFSET * scale) / Math.max(1, Math.hypot(deltaX, deltaY)),
+        ),
+      );
       const rotation = dockRect
         ? new Quaternion()
             .setFromAxisAngle(
               Z_AXIS,
-              Math.atan2(
-                -(targetCenter.y - position.y),
-                targetCenter.x - position.x,
-              ),
+              Math.atan2(deltaY, deltaX) - barrelCorrection,
             )
             .multiply(TOP_VIEW)
-        : new Quaternion();
+        : SIDE_VIEW.clone();
       const pose: Pose = {
         position: new Vector3(position.x, -position.y, 0),
         rotation,
-        scale: dockRect
-          ? Math.min(82, dockRect.width * 0.86, dockRect.height * 0.93)
-          : rackScale,
+        scale,
       };
       let visual = visuals.get(slot.id);
       if (!visual) {
@@ -425,9 +462,6 @@ function createRuntime(
         visuals.set(slot.id, visual);
       }
       visual.slot = slot;
-      visual.endpoint = target
-        ? outsideSeat(targetCenter, position, localRect(target))
-        : null;
       visual.marker.dataset.ownerId = slot.ownerId || "";
       visual.marker.dataset.targetId = slot.targetId || "";
       visual.marker.dataset.pose = dockRect ? "held" : "rack";
@@ -506,26 +540,27 @@ function createRuntime(
           .map((value) => value.toFixed(5))
           .join(",");
         marker.dataset.scale = model.scale.x.toFixed(2);
-        const hasLine = !!visual.slot.ownerId && !!visual.endpoint;
-        visual.line.style.display = hasLine ? "" : "none";
-        visual.dot.style.display = hasLine ? "" : "none";
-        if (hasLine) {
-          currentDirection.set(1, 0, 0).applyQuaternion(model.quaternion);
-          visual.line.setAttribute(
-            "x1",
-            String(model.position.x + currentDirection.x * model.scale.x * 0.5),
-          );
-          visual.line.setAttribute(
-            "y1",
-            String(
-              -model.position.y - currentDirection.y * model.scale.x * 0.5,
-            ),
-          );
-          visual.line.setAttribute("x2", String(visual.endpoint!.x));
-          visual.line.setAttribute("y2", String(visual.endpoint!.y));
-          visual.dot.setAttribute("cx", String(visual.endpoint!.x));
-          visual.dot.setAttribute("cy", String(visual.endpoint!.y));
-        }
+        currentDirection.set(1, 0, 0).applyQuaternion(model.quaternion);
+        currentUp.set(0, 1, 0).applyQuaternion(model.quaternion);
+        currentSide.set(0, 0, 1).applyQuaternion(model.quaternion);
+        const heading = Math.atan2(currentDirection.y, currentDirection.x);
+        const crossX = -Math.sin(heading);
+        const crossY = Math.cos(heading);
+        const footprintWidth =
+          Math.abs(currentUp.x * crossX + currentUp.y * crossY) * modelHeight +
+          Math.abs(currentSide.x * crossX + currentSide.y * crossY) *
+            modelDepth;
+        visual.shadow.position.set(
+          model.position.x + 2,
+          model.position.y - 3,
+          -120,
+        );
+        visual.shadow.rotation.z = heading;
+        visual.shadow.scale.set(
+          model.scale.x * 1.05,
+          model.scale.x * Math.max(0.16, footprintWidth) * 1.15,
+          1,
+        );
       }
       renderer.render(scene, camera);
       frameCount += 1;
@@ -598,6 +633,41 @@ function createRuntime(
     renderer.setClearColor(0x000000, 0);
     renderer.outputColorSpace = SRGBColorSpace;
     renderer.toneMapping = ACESFilmicToneMapping;
+    const room = new RoomEnvironment();
+    const generator = new PMREMGenerator(renderer);
+    const renderState = {
+      target: renderer.getRenderTarget(),
+      cubeFace: renderer.getActiveCubeFace(),
+      mipLevel: renderer.getActiveMipmapLevel(),
+      autoClear: renderer.autoClear,
+      toneMapping: renderer.toneMapping,
+      xrEnabled: renderer.xr.enabled,
+    };
+    let failedTarget: WebGLRenderTarget | null = null;
+    try {
+      environment = generator.fromScene(room, 0.02, 0.1, 100, { size: 128 });
+      scene.environment = environment.texture;
+      layer.dataset.environment = "studio";
+    } catch {
+      // Direct lighting remains usable when an environment target cannot allocate.
+      failedTarget = renderer.getRenderTarget();
+      layer.dataset.environment = "direct-light";
+    } finally {
+      // PMREM restores these only on success. A failed offscreen pass must not
+      // leave subsequent game frames bound to its framebuffer or disable clear.
+      renderer.setRenderTarget(
+        renderState.target,
+        renderState.cubeFace,
+        renderState.mipLevel,
+      );
+      renderer.autoClear = renderState.autoClear;
+      renderer.toneMapping = renderState.toneMapping;
+      renderer.xr.enabled = renderState.xrEnabled;
+      if (failedTarget && failedTarget !== renderState.target)
+        failedTarget.dispose();
+      room.dispose();
+      generator.dispose();
+    }
     applyTheme();
     new GLTFLoader().load(
       "/models/desert-eagle.glb",
@@ -607,8 +677,10 @@ function createRuntime(
           return;
         }
         source = gltf.scene;
+        tuneGunMaterials(source);
         const size = new Box3().setFromObject(source).getSize(new Vector3());
         modelHeight = Math.max(0.2, size.y / Math.max(size.x, 0.01));
+        modelDepth = Math.max(0.05, size.z / Math.max(size.x, 0.01));
         requestLayout(true);
       },
       undefined,
@@ -650,13 +722,14 @@ function createRuntime(
       reduceMotion.removeEventListener("change", onReduceMotion);
       canvas.removeEventListener("webglcontextlost", onContextLost);
       document.fonts.removeEventListener("loadingdone", onResize);
-      if (source) disposeAsset(source);
+      disposeAsset(source, [shadowGeometry], [shadowMaterial]);
+      scene.environment = null;
+      environment?.dispose();
       visuals.clear();
       gunGroup.clear();
       renderer?.dispose();
       // StrictMode can immediately reuse this canvas. Forced context loss would
       // asynchronously invalidate that next renderer; dispose releases ours.
-      svg.replaceChildren();
       markers.replaceChildren();
     },
   };
@@ -665,19 +738,16 @@ function createRuntime(
 export default function GunTable(props: GunTableProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
   const markersRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<Runtime | null>(null);
   const latestProps = useRef(props);
   latestProps.current = props;
-  const maskId = `gun-table-mask-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   useEffect(() => {
     if (
       !props.tableRef.current ||
       !layerRef.current ||
       !canvasRef.current ||
-      !svgRef.current ||
       !markersRef.current
     )
       return;
@@ -687,16 +757,14 @@ export default function GunTable(props: GunTableProps) {
       latestProps.current,
       layerRef.current,
       canvasRef.current,
-      svgRef.current,
       markersRef.current,
-      maskId,
     );
     runtimeRef.current = runtime;
     return () => {
       runtime.dispose();
       runtimeRef.current = null;
     };
-  }, [props.tableRef, maskId]);
+  }, [props.tableRef]);
 
   useEffect(() => {
     runtimeRef.current?.update(props);
@@ -710,7 +778,6 @@ export default function GunTable(props: GunTableProps) {
       data-status="loading"
       data-motion="idle"
     >
-      <svg ref={svgRef} className="gun-table-directions" focusable="false" />
       <canvas ref={canvasRef} className="gun-table-canvas" />
       <div ref={markersRef} className="gun-table-model-state" hidden />
     </div>

@@ -1,11 +1,21 @@
+.game-table .players-ring {
+  min-height: 0;
+  row-gap: 220px;
+  align-items: start;
+}
+.game-table .table-center {
+  width: min(480px, calc(100% - 40px));
+}
 .gun-rack {
-  width: 400px;
-  height: 68px;
+  width: 100%;
+  height: 82px;
   flex: none;
   pointer-events: none;
 }
 .game-table .gun-supply {
-  margin-top: 6px;
+  margin-top: 8px;
+  border: 0;
+  background: none;
 }
 .game-table .shot-countdown {
   position: absolute;
@@ -14,11 +24,16 @@
   margin-top: 0;
 }
 .gun-dock {
-  width: 100%;
-  height: 64px;
-  min-height: 64px;
-  margin-top: 4px;
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 45px);
+  width: 112px;
+  height: 0;
+  transform: translateX(-50%);
   pointer-events: none;
+}
+.player-seat[data-table-half="bottom"] .gun-dock {
+  top: -45px;
 }
 .gun-table-layer {
   position: absolute;
@@ -34,8 +49,7 @@
 .gun-table-layer *::after {
   pointer-events: none;
 }
-.gun-table-canvas,
-.gun-table-directions {
+.gun-table-canvas {
   position: absolute;
   inset: 0;
   display: block;
@@ -50,38 +64,44 @@
 .gun-table-layer[data-status="ready"] .gun-table-canvas {
   opacity: 1;
 }
-.gun-table-directions {
-  opacity: 0;
-}
-.gun-table-layer[data-status="ready"] .gun-table-directions {
-  opacity: 1;
-}
-.gun-table-aim-line {
-  stroke: #9cc7d4;
-  stroke-width: 1;
-  stroke-dasharray: 3 6;
-  stroke-linecap: round;
-  opacity: 0.3;
-}
-.gun-table-aim-dot {
-  fill: #b4dbe6;
-  opacity: 0.5;
-}
-.gun-table-layer[data-theme="light"] .gun-table-aim-line {
-  stroke: #32687d;
-  opacity: 0.28;
-}
-.gun-table-layer[data-theme="light"] .gun-table-aim-dot {
-  fill: #32687d;
-  opacity: 0.6;
-}
 .gun-table-layer[data-status="error"] {
   visibility: hidden;
 }
 @media (max-width: 640px) {
+  .game-table .players-ring {
+    row-gap: 190px;
+  }
+  .game-table .table-center {
+    width: 220px;
+  }
   .gun-rack {
     width: 220px;
-    height: 50px;
+    height: 54px;
+  }
+  .gun-dock {
+    width: 86px;
+    top: calc(100% + 38px);
+  }
+  .player-seat[data-table-half="bottom"] .gun-dock {
+    top: -38px;
+  }
+  .game-table:is(.players-5, .players-6, .players-7, .players-8) {
+    padding-bottom: 86px;
+  }
+  .game-table:is(.players-5, .players-6, .players-7, .players-8) .players-ring {
+    row-gap: 86px;
+  }
+  .game-table:is(.players-5, .players-6, .players-7, .players-8) .table-center {
+    width: 68px;
+    opacity: 1;
+  }
+  .game-table:is(.players-5, .players-6, .players-7, .players-8) .gun-dock {
+    top: calc(100% + 42px);
+  }
+  .game-table:is(.players-5, .players-6, .players-7, .players-8) .gun-supply {
+    flex-wrap: nowrap;
+    padding-inline: 0;
+    white-space: nowrap;
   }
   .players-4 .shot-countdown {
     left: calc(50% + 43px);
